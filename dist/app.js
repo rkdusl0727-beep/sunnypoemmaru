@@ -18,7 +18,7 @@ const ZONE_TRAVEL_DURATION=1.55;
 const PITCH_MIN=-.24,PITCH_MAX=.42;
 let zoneTravelStartAngle=0,zoneTravelAngleDelta=0,zoneTravelStartRadius=0,zoneTravelEndRadius=0,zoneTravelStartYaw=0,zoneTravelEndYaw=0,zoneTravelChild=0;
 const WALK_BOUNDS={minX:-11.55,maxX:11.55,minZ:-9.7,maxZ:10};
-const SAFE_ZONES=[{x:0,z:0,r:3.35}];
+const SAFE_ZONES=[];
 const ZONE_LAYOUT=[
   {x:-11.25,z:-13.15,ry:0},{x:-3.75,z:-13.15,ry:0},{x:3.75,z:-13.15,ry:0},{x:11.25,z:-13.15,ry:0},
   {x:-15,z:-7.5,ry:Math.PI/2},{x:-15,z:0,ry:Math.PI/2},{x:-15,z:7.5,ry:Math.PI/2},
@@ -63,7 +63,7 @@ function buildGallery(){
   for(let i=0;i<4;i++){const stripe=new THREE.Mesh(new THREE.PlaneGeometry(.72,10),new THREE.MeshBasicMaterial({color:0xffdfad,transparent:true,opacity:.1,depthWrite:false,side:THREE.DoubleSide}));stripe.rotation.x=-Math.PI/2;stripe.rotation.z=-.58;stripe.position.set(-5+i*1.25,.035,1+i*.35);scene.add(stripe)}
   scene.userData.frameSideMaterial=new THREE.MeshStandardMaterial({color:0x8d5b34,roughness:.72,metalness:0});
   for(let i=0;i<10;i++)buildZone(i);
-  buildCenterSculpture();buildCurator();buildWarmLights();buildCozyDetails();
+  buildCurator();buildWarmLights();buildCozyDetails();
 }
 function buildEntrance(){
   const loader=new THREE.TextureLoader(),facadeMap=loader.load('assets/entrance-facade-2d.png'),gardenMap=loader.load('assets/garden-view-2d.png'),doorMap=loader.load('assets/door-leaf-2d.png');[facadeMap,gardenMap,doorMap].forEach(t=>t.colorSpace=THREE.SRGBColorSpace);
@@ -109,11 +109,6 @@ function makePoemTexture(ci,pi){
   const bead=x.createRadialGradient(558,768,4,566,776,24);bead.addColorStop(0,'#fff8');bead.addColorStop(.34,d.color);bead.addColorStop(1,'#8f694d');
   x.fillStyle=bead;x.beginPath();x.arc(566,776,22,0,Math.PI*2);x.fill();x.strokeStyle='#ffffffaa';x.lineWidth=3;x.stroke();
   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),coarsePointer?2:4);return t;
-}
-function buildCenterSculpture(){
-  const g=makePngSprite('assets/centerpiece-tree.png',6.8,6.05,[0,3,0]);g.material.depthWrite=true;g.material.depthTest=true;g.renderOrder=1;scene.userData.sculpture=g;
-  makeContactShadow(0,0,6.4,4.35,.24);
-  const light=new THREE.PointLight(0xffc77a,3.4,11,2);light.position.set(0,3.65,0);scene.add(light);
 }
 function buildPlant(x,z){
   makePngSprite('assets/planter-png.png',1.12,1.42,[x,.69,z]);makeContactShadow(x,z,.8,.34,.19);
