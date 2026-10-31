@@ -26,9 +26,15 @@ const ZONE_LAYOUT=[
 ];
 const visited=new Set(JSON.parse(localStorage.getItem('galleryVisited')||'[]'));
 const poemPngTextures=new Map();
-const poemArtMeshes=new Map(),scanRecords=new Map();
+const poemArtMeshes=new Map(),frameGroups=new Map(),zoneFrameGroups=new Map(),scanRecords=new Map();
 const SCAN_DB_NAME='sunny-poem-original-scans',SCAN_STORE='scans';
 let scanDbPromise=null,activeScanUrl=null;
+const FRAME_PRESETS={
+  'portrait-small':{label:'세로 소형',w:.8,h:1.18},portrait:{label:'세로 기본',w:1.06,h:1.62},'portrait-large':{label:'세로 대형',w:1.28,h:1.86},
+  'landscape-small':{label:'가로 소형',w:1.16,h:.78},landscape:{label:'가로 기본',w:1.48,h:1},'landscape-large':{label:'가로 대형',w:1.78,h:1.18}
+};
+const DEFAULT_GALLERY_CONFIG={name:'햇살 동시 마루',theme:'warm',frames:{}};
+let galleryConfig=loadGalleryConfig();
 
 function init(){
   THREE.Cache.enabled=true;
@@ -42,12 +48,13 @@ function init(){
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.18;
   renderer.shadowMap.enabled=!coarsePointer;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   clock=new THREE.Clock();raycaster=new THREE.Raycaster();
-  buildGallery();bind();buildIndex();buildSettings();loadStoredScans();renderer.compile(scene,camera);if(renderer.shadowMap.enabled){renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true}animate();
+  buildGallery();bind();buildIndex();buildSettings();applyGalleryName(galleryConfig.name,false);applyGalleryTheme(galleryConfig.theme,false);loadStoredScans();renderer.compile(scene,camera);if(renderer.shadowMap.enabled){renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true}animate();
   setTimeout(()=>$('#loading').classList.add('done'),450);
 }
 
 function buildGallery(){
   const textureLoader=new THREE.TextureLoader();
+  scene.userData.theme={panels:[],bases:[],decor:[]};
   scene.userData.cottonTexture=textureLoader.load('assets/cotton-surface-2d.png');scene.userData.cottonTexture.colorSpace=THREE.SRGBColorSpace;scene.userData.cottonTexture.wrapS=scene.userData.cottonTexture.wrapT=THREE.RepeatWrapping;scene.userData.cottonTexture.repeat.set(3,3);
   scene.userData.frameTexture=textureLoader.load('assets/wood-frame-png.png');scene.userData.frameTexture.colorSpace=THREE.SRGBColorSpace;
   scene.userData.floorTexture=textureLoader.load('assets/oak-floor-25d.png');scene.userData.floorTexture.colorSpace=THREE.SRGBColorSpace;scene.userData.floorTexture.wrapS=scene.userData.floorTexture.wrapT=THREE.RepeatWrapping;scene.userData.floorTexture.repeat.set(8,7);scene.userData.floorTexture.anisotropy=coarsePointer?2:4;
@@ -58,8 +65,9 @@ function buildGallery(){
   const marker=new THREE.Mesh(new THREE.RingGeometry(.2,.32,32),new THREE.MeshBasicMaterial({color:0xb87538,transparent:true,opacity:.88,side:THREE.DoubleSide,depthWrite:false}));marker.rotation.x=-Math.PI/2;marker.position.y=.018;marker.visible=false;scene.add(marker);scene.userData.clickMarker=marker;
   const ceiling=new THREE.Mesh(new THREE.PlaneGeometry(30.8,27),new THREE.MeshStandardMaterial({color:0xfff4df,roughness:.92,side:THREE.DoubleSide}));
   ceiling.rotation.x=Math.PI/2;ceiling.position.y=5.7;scene.add(ceiling);
+  scene.userData.theme.floor=floor.material;scene.userData.theme.ceiling=ceiling.material;
   const canopy=new THREE.Mesh(new THREE.PlaneGeometry(9.4,26.6),new THREE.MeshStandardMaterial({map:scene.userData.cottonTexture,color:0xfffbf3,transparent:true,opacity:.46,roughness:1,side:THREE.DoubleSide,depthWrite:false}));
-  canopy.rotation.x=Math.PI/2;canopy.position.y=5.68;scene.add(canopy);
+  canopy.rotation.x=Math.PI/2;canopy.position.y=5.68;scene.add(canopy);scene.userData.theme.canopy=canopy;
   buildEntrance();
   const sun=new THREE.DirectionalLight(0xffcb88,3.2);sun.position.set(-8,12,5);sun.target.position.set(2,0,-2);sun.castShadow=renderer.shadowMap.enabled;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-18;sun.shadow.camera.right=18;sun.shadow.camera.top=18;sun.shadow.camera.bottom=-18;scene.add(sun,sun.target);
   const sunPatch=new THREE.Mesh(new THREE.PlaneGeometry(8.5,10),new THREE.MeshBasicMaterial({color:0xffd699,transparent:true,opacity:.14,depthWrite:false}));sunPatch.rotation.x=-Math.PI/2;sunPatch.position.set(-3,.025,2);scene.add(sunPatch);
@@ -73,7 +81,7 @@ function buildEntrance(){
   const loader=new THREE.TextureLoader(),facadeMap=loader.load('assets/entrance-facade-2d.png'),gardenMap=loader.load('assets/garden-view-2d.png'),doorMap=loader.load('assets/door-leaf-2d.png');[facadeMap,gardenMap,doorMap].forEach(t=>t.colorSpace=THREE.SRGBColorSpace);
   const deck=new THREE.Mesh(new THREE.PlaneGeometry(7.6,6.2),new THREE.MeshStandardMaterial({map:scene.userData.floorTexture,color:0xffffff,roughness:.88}));deck.rotation.x=-Math.PI/2;deck.position.set(0,-.005,15.75);deck.receiveShadow=true;scene.add(deck);
   const gardenBackdrop=new THREE.Mesh(new THREE.PlaneGeometry(22,9.6),new THREE.MeshBasicMaterial({map:gardenMap,side:THREE.DoubleSide}));gardenBackdrop.position.set(0,4.3,21);scene.add(gardenBackdrop);
-  const facade=new THREE.Mesh(new THREE.PlaneGeometry(30.4,5.7),new THREE.MeshBasicMaterial({map:facadeMap,transparent:true,alphaTest:.025,side:THREE.DoubleSide}));facade.position.set(0,2.85,13.2);facade.renderOrder=2;scene.add(facade);scene.userData.entranceFacade=facade;
+  const facade=new THREE.Mesh(new THREE.PlaneGeometry(30.4,5.7),new THREE.MeshBasicMaterial({map:facadeMap,color:0xffffff,transparent:true,alphaTest:.025,side:THREE.DoubleSide}));facade.position.set(0,2.85,13.2);facade.renderOrder=2;scene.add(facade);scene.userData.entranceFacade=facade;scene.userData.theme.facade=facade.material;
   [-9.6,9.6].forEach(x=>{const lightPatch=new THREE.Mesh(new THREE.PlaneGeometry(5.4,4.2),new THREE.MeshBasicMaterial({color:0xffe2aa,transparent:true,opacity:.13,depthWrite:false,side:THREE.DoubleSide}));lightPatch.rotation.x=-Math.PI/2;lightPatch.position.set(x,.03,9.7);scene.add(lightPatch)});
   const leaves=[];[-1,1].forEach(side=>{const map=doorMap.clone();map.needsUpdate=true;if(side<0){map.wrapS=THREE.RepeatWrapping;map.repeat.x=-1;map.offset.x=1}const pivot=new THREE.Group();pivot.position.set(side*2.52,0,13.12);const panel=new THREE.Mesh(new THREE.PlaneGeometry(2.52,4.72),new THREE.MeshBasicMaterial({map,transparent:true,alphaTest:.035,side:THREE.DoubleSide}));panel.position.set(-side*1.26,2.36,0);panel.renderOrder=3;pivot.add(panel);scene.add(pivot);leaves.push(pivot)});scene.userData.doors=leaves;
 }
@@ -81,39 +89,54 @@ function buildZone(ci){
   const layout=ZONE_LAYOUT[ci],c=children[ci],zone=new THREE.Group();zone.position.set(layout.x,0,layout.z);zone.rotation.y=layout.ry;scene.add(zone);
   const panel=new THREE.Mesh(new THREE.BoxGeometry(7.18,5,.28),new THREE.MeshStandardMaterial({color:0xf1dfc3,roughness:.9}));panel.position.y=2.55;panel.receiveShadow=true;zone.add(panel);
   const wood=new THREE.Mesh(new THREE.BoxGeometry(7.2,1.02,.32),new THREE.MeshStandardMaterial({color:0x9b6840,roughness:.85}));wood.position.y=.53;zone.add(wood);
-  const header=new THREE.Mesh(new THREE.PlaneGeometry(3.8,.95),new THREE.MeshBasicMaterial({map:makeTextTexture(c.name,'작은 시인의 방',c.color,1024,256),transparent:true}));
+  scene.userData.theme.panels.push(panel.material);scene.userData.theme.bases.push(wood.material);
+  const header=new THREE.Mesh(new THREE.PlaneGeometry(3.8,.95),new THREE.MeshBasicMaterial({map:makeTextTexture(c.name,'어린이 작가의 방',c.color,1024,256),transparent:true}));
   header.position.set(0,4.35,.17);zone.add(header);
   const accent=new THREE.Mesh(new THREE.BoxGeometry(6.65,.06,.08),new THREE.MeshBasicMaterial({color:c.color}));accent.position.set(0,3.84,.18);zone.add(accent);
-  c.poems.forEach((p,pi)=>{
-    const framedArt=new THREE.Group();framedArt.position.set((pi-2)*1.4,2.55,.22);
-    const frameBody=new THREE.Mesh(new THREE.BoxGeometry(1.06,1.62,.16),scene.userData.frameSideMaterial);frameBody.castShadow=renderer.shadowMap.enabled;framedArt.add(frameBody);
-    const art=new THREE.Mesh(new THREE.PlaneGeometry(.88,1.36),new THREE.MeshStandardMaterial({map:makePoemPngTexture(ci,pi),roughness:.48,emissive:new THREE.Color(c.color),emissiveIntensity:.045,side:THREE.DoubleSide}));art.position.z=.086;art.userData={type:'poem',child:ci,poem:pi};frameMeshes.push(art);poemArtMeshes.set(`${ci}-${pi}`,art);framedArt.add(art);
-    const frame=new THREE.Mesh(new THREE.PlaneGeometry(1.08,1.64),new THREE.MeshBasicMaterial({map:scene.userData.frameTexture,transparent:true,alphaTest:.035,depthWrite:false,toneMapped:true,side:THREE.DoubleSide}));frame.position.z=.098;frame.renderOrder=2;framedArt.add(frame);zone.add(framedArt);
-  });
+  const groups=[];c.poems.forEach((p,pi)=>{
+    const key=`${ci}-${pi}`,preset=galleryConfig.frames[key]||'portrait',framedArt=new THREE.Group();framedArt.position.z=.22;
+    const frameBody=new THREE.Mesh(new THREE.BoxGeometry(1,1,.16),scene.userData.frameSideMaterial);frameBody.castShadow=renderer.shadowMap.enabled;framedArt.add(frameBody);
+    const art=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshStandardMaterial({map:makePoemPngTexture(ci,pi,preset),roughness:.48,emissive:new THREE.Color(c.color),emissiveIntensity:.045,side:THREE.DoubleSide}));art.position.z=.086;art.userData={type:'poem',child:ci,poem:pi};frameMeshes.push(art);poemArtMeshes.set(key,art);framedArt.add(art);
+    const frame=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:scene.userData.frameTexture,transparent:true,alphaTest:.035,depthWrite:false,toneMapped:true,side:THREE.DoubleSide}));frame.position.z=.098;frame.renderOrder=2;framedArt.add(frame);framedArt.userData={key,ci,pi,preset,frameBody,art,frame};frameGroups.set(key,framedArt);groups.push(framedArt);zone.add(framedArt);setFrameGeometry(framedArt,preset);
+  });zoneFrameGroups.set(ci,groups);layoutZoneFrames(ci);
   const glowPos=zoneLocalToWorld(layout,0,2.2);const zoneGlow=new THREE.PointLight(c.color,.38,6,2);zoneGlow.position.set(glowPos.x,3.6,glowPos.z);scene.add(zoneGlow);
   const plantPos=zoneLocalToWorld(layout,2.95,1.05);buildPlant(plantPos.x,plantPos.z);
 }
 
 function zoneLocalToWorld(layout,x,z){return new THREE.Vector3(layout.x+Math.cos(layout.ry)*x+Math.sin(layout.ry)*z,0,layout.z-Math.sin(layout.ry)*x+Math.cos(layout.ry)*z)}
+function loadGalleryConfig(){try{const saved=JSON.parse(localStorage.getItem('galleryConfig')||'{}'),frames=saved.frames&&typeof saved.frames==='object'?Object.fromEntries(Object.entries(saved.frames).filter(([key,value])=>/^\d-\d$/.test(key)&&FRAME_PRESETS[value])):{};return{name:typeof saved.name==='string'&&saved.name.trim()?saved.name.trim().slice(0,30):DEFAULT_GALLERY_CONFIG.name,theme:['warm','white'].includes(saved.theme)?saved.theme:'warm',frames}}catch{return{name:DEFAULT_GALLERY_CONFIG.name,theme:'warm',frames:{}}}}
+function saveGalleryConfig(){localStorage.setItem('galleryConfig',JSON.stringify(galleryConfig))}
+function applyGalleryName(name,persist=true){
+  const clean=(name||DEFAULT_GALLERY_CONFIG.name).trim().slice(0,30)||DEFAULT_GALLERY_CONFIG.name,parts=clean.split(/\s+/),first=parts.shift(),rest=parts.join(' ');galleryConfig.name=clean;
+  const title=$('#intro-title'),accent=document.createElement('em');accent.textContent=first;title.replaceChildren(accent);if(rest)title.append(document.createElement('br'),document.createTextNode(rest));$('.logo span').textContent=clean;document.title=`${clean} — 3D 전시장`;$('#gallery-name').value=clean;if(persist)saveGalleryConfig()
+}
+function applyGalleryTheme(theme,persist=true){
+  const selected=theme==='white'?'white':'warm',t=scene.userData.theme;galleryConfig.theme=selected;document.body.dataset.galleryTheme=selected;
+  if(selected==='white'){scene.background.set(0xf3f4ef);scene.fog.color.set(0xf3f4ef);t.floor.color.set(0xe9e7e1);t.floor.roughness=.68;t.ceiling.color.set(0xffffff);t.facade.color.set(0xdfe4df);t.canopy.visible=false;t.decor.forEach(item=>item.visible=false);t.panels.forEach(m=>m.color.set(0xfafaf7));t.bases.forEach(m=>m.color.set(0xe4ded4));renderer.toneMappingExposure=1.32}
+  else{scene.background.set(0xf8eedf);scene.fog.color.set(0xf8eedf);t.floor.color.set(0xffffff);t.floor.roughness=.88;t.ceiling.color.set(0xfff4df);t.facade.color.set(0xffffff);t.canopy.visible=true;t.decor.forEach(item=>item.visible=true);t.panels.forEach(m=>m.color.set(0xf1dfc3));t.bases.forEach(m=>m.color.set(0x9b6840));renderer.toneMappingExposure=1.18}
+  $$('[data-theme-choice]').forEach(button=>{const active=button.dataset.themeChoice===selected;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active))});if(renderer.shadowMap.enabled)renderer.shadowMap.needsUpdate=true;if(persist)saveGalleryConfig()
+}
+function setFrameGeometry(group,presetName){
+  const preset=FRAME_PRESETS[presetName]||FRAME_PRESETS.portrait,artW=Math.max(.54,preset.w-.18),artH=Math.max(.52,preset.h-.24),{frameBody,art,frame}=group.userData;
+  frameBody.geometry.dispose();frameBody.geometry=new THREE.BoxGeometry(preset.w,preset.h,.16);art.geometry.dispose();art.geometry=new THREE.PlaneGeometry(artW,artH);frame.geometry.dispose();frame.geometry=new THREE.PlaneGeometry(preset.w+.02,preset.h+.02);group.userData.preset=presetName
+}
+function layoutZoneFrames(ci){
+  const groups=zoneFrameGroups.get(ci)||[],gap=.24,width=g=>FRAME_PRESETS[g.userData.preset]?.w||1.06,total=groups.reduce((sum,g)=>sum+width(g),0)+gap*Math.max(0,groups.length-1),placeRow=(row,y)=>{const rowWidth=row.reduce((sum,g)=>sum+width(g),0)+gap*Math.max(0,row.length-1);let x=-rowWidth/2;row.forEach(g=>{const w=width(g);g.position.x=x+w/2;g.position.y=y;x+=w+gap})};
+  if(total<=6.55)placeRow(groups,2.55);else{placeRow(groups.slice(0,3),2.86);placeRow(groups.slice(3),1.43)}
+}
+async function applyFramePreset(key,presetName,persist=true){
+  const group=frameGroups.get(key);if(!group||!FRAME_PRESETS[presetName])return;galleryConfig.frames[key]=presetName;setFrameGeometry(group,presetName);layoutZoneFrames(group.userData.ci);const {ci,pi}=group.userData,art=group.userData.art,record=scanRecords.get(key);
+  if(record){try{record.displayBlob=await createDisplayBlob(record.originalBlob,presetName);await putScanRecord(record);applyScanTexture(record)}catch(error){setScanStatus(error?.message||'액자용 이미지를 다시 만들지 못했어요.',true)}}else{art.material.map=makePoemPngTexture(ci,pi,presetName);art.material.needsUpdate=true}if(persist)saveGalleryConfig()
+}
 function makeTextTexture(title,sub,color,w,h){
   const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');
   x.textAlign='center';x.fillStyle=color;x.font='76px Jua, sans-serif';x.fillText(title,w/2,105);
   x.fillStyle='#6a513d';x.font='28px Gowun Dodum, sans-serif';x.fillText(sub,w/2,164);
   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;
 }
-function makePoemPngTexture(ci,pi){
-  const key=`${ci}-${pi}`;if(poemPngTextures.has(key))return poemPngTextures.get(key);
-  const c=document.createElement('canvas');c.width=384;c.height=510;const x=c.getContext('2d'),d=children[ci],p=d.poems[pi];x.scale(.6,.6);
-  x.fillStyle='#fffaf0';x.fillRect(0,0,640,850);x.fillStyle=d.color;x.fillRect(0,0,640,28);
-  x.fillStyle='#777f91';x.font='24px Gowun Dodum, sans-serif';x.fillText(d.name,54,92);
-  x.fillStyle='#172039';x.font='56px Jua, sans-serif';x.fillText(p.title,54,180);
-  x.strokeStyle='#e5dfd2';x.beginPath();x.moveTo(54,215);x.lineTo(586,215);x.stroke();
-  x.font='30px Gowun Dodum, sans-serif';x.fillStyle='#364057';
-  ['어린이가 쓴 동시를','여기에 넣어주세요.','','가까이 다가와','작품을 눌러 보세요.'].forEach((line,i)=>x.fillText(line,54,300+i*60));
-  x.fillStyle='#a9a190';x.font='22px Gowun Dodum, sans-serif';x.fillText(`${pi+1} / 5`,54,790);
-  const bead=x.createRadialGradient(558,768,4,566,776,24);bead.addColorStop(0,'#fff8');bead.addColorStop(.34,d.color);bead.addColorStop(1,'#8f694d');
-  x.fillStyle=bead;x.beginPath();x.arc(566,776,22,0,Math.PI*2);x.fill();x.strokeStyle='#ffffffaa';x.lineWidth=3;x.stroke();
-  const png=c.toDataURL('image/png'),t=new THREE.TextureLoader().load(png);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),coarsePointer?2:4);t.userData={format:'image/png',source:'framed-poem-png'};poemPngTextures.set(key,t);return t;
+function makePoemPngTexture(ci,pi,presetName='portrait'){
+  const preset=FRAME_PRESETS[presetName]||FRAME_PRESETS.portrait,key=`${ci}-${pi}-${presetName}`;if(poemPngTextures.has(key))return poemPngTextures.get(key);const aspect=(preset.w-.18)/(preset.h-.24),c=document.createElement('canvas');c.width=640;c.height=Math.round(640/aspect);const x=c.getContext('2d'),d=children[ci],p=d.poems[pi],h=c.height,pad=Math.round(Math.min(c.width,h)*.085),landscape=aspect>1;
+  x.fillStyle='#fffaf0';x.fillRect(0,0,c.width,h);x.fillStyle=d.color;x.fillRect(0,0,c.width,Math.max(18,h*.035));x.fillStyle='#777f91';x.font=`${Math.max(18,h*.032)}px Gowun Dodum, sans-serif`;x.fillText(d.name,pad,h*.12);x.fillStyle='#172039';x.font=`${Math.max(34,h*(landscape?.095:.066))}px Jua, sans-serif`;x.fillText(p.title,pad,h*.24);x.strokeStyle='#e5dfd2';x.beginPath();x.moveTo(pad,h*.29);x.lineTo(c.width-pad,h*.29);x.stroke();x.font=`${Math.max(20,h*(landscape?.05:.036))}px Gowun Dodum, sans-serif`;x.fillStyle='#364057';['어린이의 작품 원본을','여기에 넣어주세요.','','작품을 눌러','가까이 감상해 보세요.'].forEach((line,i)=>x.fillText(line,pad,h*(.42+i*(landscape?.105:.073))));x.fillStyle='#a9a190';x.font=`${Math.max(16,h*.026)}px Gowun Dodum, sans-serif`;x.fillText(`${pi+1} / 5`,pad,h*.94);const png=c.toDataURL('image/png'),t=new THREE.TextureLoader().load(png);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),coarsePointer?2:4);t.userData={format:'image/png',source:'framed-artwork-png'};poemPngTextures.set(key,t);return t;
 }
 function buildPlant(x,z){
   makePngSprite('assets/planter-png.png',1.12,1.42,[x,.69,z]);makeContactShadow(x,z,.8,.34,.19);
@@ -127,7 +150,7 @@ function buildWarmLights(){
   const lamps=new THREE.Group(),cordMaterial=new THREE.MeshStandardMaterial({color:0x9b7652,roughness:1});for(let i=0;i<16;i++){const a=i/16*Math.PI*2,x=Math.sin(a)*8.5,z=Math.cos(a)*8.5,bulb=new THREE.Mesh(new THREE.SphereGeometry(.08,10,8),new THREE.MeshStandardMaterial({color:0xffe0a0,emissive:0xe59d3f,emissiveIntensity:1.5})),cord=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,.18,6),cordMaterial);bulb.position.set(x,5.48,z);cord.position.set(x,5.61,z);lamps.add(cord,bulb)}scene.add(lamps);
 }
 function buildCozyDetails(){
-  [[-5.4,4.4,-1.4],[5.5,4.4,-2.7],[-2.3,4.4,6]].forEach((p,i)=>makePngSprite('assets/cotton-mobile.png',3.9,2.6,p,0,i*.9));
+  [[-5.4,4.4,-1.4],[5.5,4.4,-2.7],[-2.3,4.4,6]].forEach((p,i)=>scene.userData.theme.decor.push(makePngSprite('assets/cotton-mobile.png',3.9,2.6,p,0,i*.9)));
 }
 
 function makeContactShadow(x,z,width,depth,opacity=.2){
@@ -276,18 +299,20 @@ function getNaturalKoreanVoice(){
 function speakCurator(){
   if(!('speechSynthesis' in window)||guideUtterance||speechSynthesis.speaking)return;const voice=getNaturalKoreanVoice();if(!voice)return;
   moveVelocity.set(0,0,0);hasDestination=false;scene.userData.clickMarker.visible=false;
-  const line='반가워요. 이곳에는 열 명의 어린이가 쓴 동시 쉰 편이 전시되어 있어요. 천천히 걸으며 마음에 드는 작품을 눌러 감상해 보세요.';
+  const line='반가워요. 이곳에는 열 명의 어린이 작가가 만든 작품 쉰 점이 전시되어 있어요. 천천히 걸으며 마음에 드는 작품을 눌러 감상해 보세요.';
   guideUtterance=new SpeechSynthesisUtterance(line);guideUtterance.voice=voice;guideUtterance.lang='ko-KR';guideUtterance.rate=.88;guideUtterance.pitch=.96;guideUtterance.volume=.82;if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.018,audioContext.currentTime+.35);const finish=()=>{guideUtterance=null;if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.055,audioContext.currentTime+.8)};guideUtterance.onend=finish;guideUtterance.onerror=finish;speechSynthesis.speak(guideUtterance)
 }
 function stopGuideVoice(){if('speechSynthesis' in window)speechSynthesis.cancel();guideUtterance=null;if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.055,audioContext.currentTime+.4)}
 function showPoemScan(ci,pi){
   const record=scanRecords.get(`${ci}-${pi}`),scan=$('#poem-scan'),placeholder=$('#poem-placeholder-content'),badge=$('#poem-placeholder-badge');if(activeScanUrl){URL.revokeObjectURL(activeScanUrl);activeScanUrl=null}
   if(!record){scan.hidden=true;scan.removeAttribute('src');placeholder.hidden=false;badge.hidden=false;return}
-  activeScanUrl=URL.createObjectURL(record.originalBlob);scan.src=activeScanUrl;scan.alt=`${children[ci].name}의 ${pi+1}번째 동시 원본 스캔`;scan.hidden=false;placeholder.hidden=true;badge.hidden=true
+  activeScanUrl=URL.createObjectURL(record.originalBlob);scan.src=activeScanUrl;scan.alt=`${children[ci].name}의 ${pi+1}번째 작품 원본`;scan.hidden=false;placeholder.hidden=true;badge.hidden=true
 }
 function buildSettings(){
-  const root=$('#settings-list');children.forEach((child,ci)=>{const section=document.createElement('section');section.className='scan-child';section.innerHTML=`<h3><i style="--c:${child.color}"></i>${child.name}<span>동시 5편</span></h3><div class="scan-grid">${child.poems.map((poem,pi)=>{const key=`${ci}-${pi}`;return `<article class="scan-slot" data-scan-slot="${key}"><div><strong>${pi+1}. ${poem.title}</strong><span class="scan-file-name">원본 없음</span></div><div class="scan-actions"><label>스캔 선택<input type="file" accept="image/png,image/jpeg,image/webp" data-scan-input="${key}"></label><button type="button" data-scan-remove="${key}" hidden>삭제</button></div></article>`}).join('')}</div>`;root.append(section)});
-  $$('[data-scan-input]').forEach(input=>input.onchange=async()=>{const file=input.files?.[0],key=input.dataset.scanInput;input.value='';if(!file)return;const [ci,pi]=key.split('-').map(Number);try{setScanStatus(`${children[ci].name}의 ${pi+1}번째 원본을 준비하고 있어요.`);const record=await createScanRecord(key,ci,pi,file);await putScanRecord(record);scanRecords.set(key,record);applyScanTexture(record);updateScanSlot(record);if(selectedChild===ci&&selectedPoem===pi&&$('#poem-modal').classList.contains('open'))showPoemScan(ci,pi);setScanStatus(`${children[ci].name}의 ${pi+1}번째 원본을 저장했어요.`)}catch(error){setScanStatus(error?.message||'스캔 파일을 저장하지 못했어요.',true)}});
+  $('#gallery-name').value=galleryConfig.name;const applyName=()=>{applyGalleryName($('#gallery-name').value);setScanStatus('전시장 이름을 바꿨어요.')};$('#gallery-name-apply').onclick=applyName;$('#gallery-name').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();applyName()}};$$('[data-theme-choice]').forEach(button=>button.onclick=()=>{applyGalleryTheme(button.dataset.themeChoice);setScanStatus(`${button.querySelector('strong').textContent} 배경으로 바꿨어요.`)});
+  const frameOptions=Object.entries(FRAME_PRESETS).map(([value,preset])=>`<option value="${value}">${preset.label}</option>`).join(''),root=$('#settings-list');children.forEach((child,ci)=>{const section=document.createElement('section');section.className='scan-child';section.innerHTML=`<h3><i style="--c:${child.color}"></i>${child.name}<span>작품 5점</span></h3><div class="scan-grid">${child.poems.map((poem,pi)=>{const key=`${ci}-${pi}`,preset=galleryConfig.frames[key]||'portrait';return `<article class="scan-slot" data-scan-slot="${key}"><div><strong>${pi+1}. ${poem.title}</strong><span class="scan-file-name">원본 없음</span></div><label class="frame-field"><span>액자 형태</span><select data-frame-select="${key}">${frameOptions}</select></label><div class="scan-actions"><label>원본 선택<input type="file" accept="image/png,image/jpeg,image/webp" data-scan-input="${key}"></label><button type="button" data-scan-remove="${key}" hidden>삭제</button></div></article>`}).join('')}</div>`;root.append(section);child.poems.forEach((_,pi)=>{const key=`${ci}-${pi}`;root.querySelector(`[data-frame-select="${key}"]`).value=galleryConfig.frames[key]||'portrait'})});
+  $$('[data-frame-select]').forEach(select=>select.onchange=async()=>{const key=select.dataset.frameSelect,preset=select.value;setScanStatus('액자 크기와 배치를 바꾸고 있어요.');await applyFramePreset(key,preset);setScanStatus(`${FRAME_PRESETS[preset].label} 액자로 바꿨어요.`)});
+  $$('[data-scan-input]').forEach(input=>input.onchange=async()=>{const file=input.files?.[0],key=input.dataset.scanInput;input.value='';if(!file)return;const [ci,pi]=key.split('-').map(Number);try{setScanStatus(`${children[ci].name}의 ${pi+1}번째 원본을 준비하고 있어요.`);const record=await createScanRecord(key,ci,pi,file);await putScanRecord(record);scanRecords.set(key,record);applyScanTexture(record);updateScanSlot(record);if(selectedChild===ci&&selectedPoem===pi&&$('#poem-modal').classList.contains('open'))showPoemScan(ci,pi);setScanStatus(`${children[ci].name}의 ${pi+1}번째 원본을 저장했어요.`)}catch(error){setScanStatus(error?.message||'원본 파일을 저장하지 못했어요.',true)}});
   $$('[data-scan-remove]').forEach(button=>button.onclick=async()=>{const key=button.dataset.scanRemove,[ci,pi]=key.split('-').map(Number);try{await deleteScanRecord(key);scanRecords.delete(key);restorePlaceholderTexture(ci,pi);updateScanSlot({key,name:''});if(selectedChild===ci&&selectedPoem===pi&&$('#poem-modal').classList.contains('open'))showPoemScan(ci,pi);setScanStatus(`${children[ci].name}의 ${pi+1}번째 원본을 삭제했어요.`)}catch{setScanStatus('원본을 삭제하지 못했어요.',true)}})
 }
 function setScanStatus(message,isError=false){const status=$('#scan-status');status.textContent=message;status.classList.toggle('error',isError)}
@@ -303,21 +328,24 @@ async function putScanRecord(record){const db=await openScanDb();await requestRe
 async function deleteScanRecord(key){const db=await openScanDb();await requestResult(db.transaction(SCAN_STORE,'readwrite').objectStore(SCAN_STORE).delete(key))}
 function loadFileImage(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),image=new Image();image.onload=()=>{URL.revokeObjectURL(url);resolve(image)};image.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('스캔 이미지를 읽을 수 없어요.'))};image.src=url})}
 function canvasBlob(canvas,type='image/png'){return new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('PNG 이미지를 만들 수 없어요.')),type))}
+async function createDisplayBlob(file,presetName='portrait'){
+  const image=await loadFileImage(file),preset=FRAME_PRESETS[presetName]||FRAME_PRESETS.portrait,aspect=(preset.w-.18)/(preset.h-.24),canvas=document.createElement('canvas');canvas.width=900;canvas.height=Math.round(canvas.width/aspect);const ctx=canvas.getContext('2d');ctx.fillStyle='#fffaf0';ctx.fillRect(0,0,canvas.width,canvas.height);const margin=Math.round(Math.min(canvas.width,canvas.height)*.045),scale=Math.min((canvas.width-margin*2)/image.naturalWidth,(canvas.height-margin*2)/image.naturalHeight),w=image.naturalWidth*scale,h=image.naturalHeight*scale;ctx.drawImage(image,(canvas.width-w)/2,(canvas.height-h)/2,w,h);return canvasBlob(canvas)
+}
 async function createScanRecord(key,ci,pi,file){
   if(!/^image\/(png|jpeg|webp)$/i.test(file.type))throw new Error('PNG, JPG 또는 WEBP 스캔 이미지를 선택해 주세요.');if(file.size>25*1024*1024)throw new Error('스캔 파일은 한 장당 25MB 이하로 넣어 주세요.');
-  const image=await loadFileImage(file),canvas=document.createElement('canvas');canvas.width=640;canvas.height=990;const ctx=canvas.getContext('2d');ctx.fillStyle='#fffaf0';ctx.fillRect(0,0,canvas.width,canvas.height);const margin=28,scale=Math.min((canvas.width-margin*2)/image.naturalWidth,(canvas.height-margin*2)/image.naturalHeight),w=image.naturalWidth*scale,h=image.naturalHeight*scale;ctx.drawImage(image,(canvas.width-w)/2,(canvas.height-h)/2,w,h);const displayBlob=await canvasBlob(canvas);return{key,ci,pi,name:file.name,originalBlob:file,displayBlob,width:image.naturalWidth,height:image.naturalHeight,updatedAt:Date.now()}
+  const image=await loadFileImage(file),displayBlob=await createDisplayBlob(file,galleryConfig.frames[key]||'portrait');return{key,ci,pi,name:file.name,originalBlob:file,displayBlob,width:image.naturalWidth,height:image.naturalHeight,updatedAt:Date.now()}
 }
 function applyScanTexture(record){
   const mesh=poemArtMeshes.get(record.key);if(!mesh)return;const url=URL.createObjectURL(record.displayBlob),texture=new THREE.TextureLoader().load(url,()=>URL.revokeObjectURL(url));texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),coarsePointer?2:4);texture.userData={format:'image/png',source:'original-scan-display'};mesh.material.map=texture;mesh.material.needsUpdate=true
 }
-function restorePlaceholderTexture(ci,pi){const mesh=poemArtMeshes.get(`${ci}-${pi}`);if(!mesh)return;mesh.material.map=makePoemPngTexture(ci,pi);mesh.material.needsUpdate=true}
+function restorePlaceholderTexture(ci,pi){const key=`${ci}-${pi}`,mesh=poemArtMeshes.get(key);if(!mesh)return;mesh.material.map=makePoemPngTexture(ci,pi,galleryConfig.frames[key]||'portrait');mesh.material.needsUpdate=true}
 function updateScanSlot(record){const slot=$(`[data-scan-slot="${record.key}"]`);if(!slot)return;const hasFile=!!record.name;slot.classList.toggle('filled',hasFile);slot.querySelector('.scan-file-name').textContent=hasFile?record.name:'원본 없음';slot.querySelector('[data-scan-remove]').hidden=!hasFile}
 function buildIndex(){
   const root=$('#index-list');
   children.forEach((c,ci)=>{
     const el=document.createElement('div');el.className='index-child';
-    el.innerHTML=`<div class="index-child-row"><button class="index-child-go" type="button" aria-label="${c.name} 전시공간으로 이동"><i style="--c:${c.color}"></i><strong>${c.name}</strong></button><button class="index-child-toggle" type="button" aria-label="${c.name}의 동시 5편 펼치기" aria-expanded="false">동시 5편</button></div><div class="index-poems">${c.poems.map((p,pi)=>`<button type="button" data-ci="${ci}" data-pi="${pi}">${pi+1}. ${p.title}</button>`).join('')}</div>`;
-    const go=el.querySelector('.index-child-go'),toggle=el.querySelector('.index-child-toggle');go.onclick=()=>goToChildZone(ci);toggle.onclick=()=>{const open=el.classList.toggle('open');toggle.setAttribute('aria-expanded',String(open));toggle.setAttribute('aria-label',`${c.name}의 동시 5편 ${open?'접기':'펼치기'}`)};root.append(el);
+    el.innerHTML=`<div class="index-child-row"><button class="index-child-go" type="button" aria-label="${c.name} 전시공간으로 이동"><i style="--c:${c.color}"></i><strong>${c.name}</strong></button><button class="index-child-toggle" type="button" aria-label="${c.name}의 작품 5점 펼치기" aria-expanded="false">작품 5점</button></div><div class="index-poems">${c.poems.map((p,pi)=>`<button type="button" data-ci="${ci}" data-pi="${pi}">${pi+1}. ${p.title}</button>`).join('')}</div>`;
+    const go=el.querySelector('.index-child-go'),toggle=el.querySelector('.index-child-toggle');go.onclick=()=>goToChildZone(ci);toggle.onclick=()=>{const open=el.classList.toggle('open');toggle.setAttribute('aria-expanded',String(open));toggle.setAttribute('aria-label',`${c.name}의 작품 5점 ${open?'접기':'펼치기'}`)};root.append(el);
   });
   $$('[data-ci]').forEach(b=>b.onclick=()=>{closeIndex();openPoem(+b.dataset.ci,+b.dataset.pi)});
 }
