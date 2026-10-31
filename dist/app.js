@@ -6,8 +6,9 @@ const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const adminMode=document.body.dataset.admin==='true';
 const canvas=$('#gallery-canvas');
 let scene,camera,renderer,clock,raycaster,frameMeshes=[],yaw=0,pitch=0,started=false,modalOpen=false,overviewMode=false;
-let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,lastX=0,lastY=0,keys={},joy={x:0,y:0};
+let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,dragMode=null,dragStartX=0,dragStartY=0,lastX=0,lastY=0,keys={},joy={x:0,y:0};
 let tourActive=false,tourElapsed=0,entryActive=false,entryElapsed=0,hasDestination=false,zoneTravelActive=false,zoneTravelElapsed=0;
+let destinationTurnsView=true;
 let audioContext,audioMaster,musicTimer,musicStep=0,musicOn=true;
 let guideUtterance=null,contactShadowTexture=null;
 const coarsePointer=matchMedia('(pointer:coarse)').matches||innerWidth<800,reduceMotion=matchMedia('(prefers-reduced-motion:reduce)').matches,moveVelocity=new THREE.Vector3(),moveTarget=new THREE.Vector3(),moveDestination=new THREE.Vector3(),curatorTarget=new THREE.Vector3(),clickPoint=new THREE.Vector2();
@@ -170,11 +171,11 @@ function bind(){
   addEventListener('resize',resize);
   addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key==='Escape'){closePoem();closeIndex();if(adminMode)closeSettings();stopGuideVoice()}});
   addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
-  canvas.addEventListener('pointerdown',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;dragging=true;dragMoved=false;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId)});
-  canvas.addEventListener('pointermove',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive||!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;if(Math.abs(dx)+Math.abs(dy)>3)dragMoved=true;yaw-=dx*.0042;pitch=THREE.MathUtils.clamp(pitch-dy*.0034,PITCH_MIN,PITCH_MAX);lastX=e.clientX;lastY=e.clientY});
-  canvas.addEventListener('pointerleave',()=>{dragging=false});
-  canvas.addEventListener('pointerup',e=>{if(dragging&&!dragMoved)handleWorldClick(e.clientX,e.clientY);dragging=false});
-  canvas.addEventListener('wheel',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;e.preventDefault();pitch=THREE.MathUtils.clamp(pitch-e.deltaY*.00075,PITCH_MIN,PITCH_MAX);camera.rotation.x=pitch},{passive:false});
+  canvas.addEventListener('pointerdown',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;dragging=true;dragMoved=false;dragMode=null;dragStartX=lastX=e.clientX;dragStartY=lastY=e.clientY;canvas.classList.add('is-dragging');canvas.setPointerCapture(e.pointerId)});
+  canvas.addEventListener('pointermove',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive||!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY,totalX=e.clientX-dragStartX,totalY=e.clientY-dragStartY;if(Math.abs(totalX)+Math.abs(totalY)>7){dragMoved=true;if(!dragMode)dragMode=e.shiftKey||Math.abs(totalX)>=Math.abs(totalY)*.9?'look':'move'}if(dragMode==='move'){queueDirectionalMove(-dy*.022);canvas.classList.add('is-moving-drag')}else if(dragMode==='look'){yaw-=dx*.0042;pitch=THREE.MathUtils.clamp(pitch-dy*.003,PITCH_MIN,PITCH_MAX);camera.rotation.set(pitch,yaw,0)}lastX=e.clientX;lastY=e.clientY});
+  const finishDrag=e=>{if(dragging&&!dragMoved&&e?.type==='pointerup')handleWorldClick(e.clientX,e.clientY);dragging=false;dragMode=null;canvas.classList.remove('is-dragging','is-moving-drag')};
+  canvas.addEventListener('pointerleave',finishDrag);canvas.addEventListener('pointercancel',finishDrag);canvas.addEventListener('lostpointercapture',finishDrag);canvas.addEventListener('pointerup',finishDrag);
+  canvas.addEventListener('wheel',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;e.preventDefault();if(e.shiftKey){pitch=THREE.MathUtils.clamp(pitch-e.deltaY*.00075,PITCH_MIN,PITCH_MAX);camera.rotation.x=pitch;return}const distance=THREE.MathUtils.clamp(-e.deltaY*.016,-2.4,2.4);if(Math.abs(distance)>.03)queueDirectionalMove(distance)},{passive:false});
   $('#enter').onclick=()=>{started=true;$('#intro').classList.add('closed');$('#hud').hidden=false;startAmbientMusic();startEntrySequence()};
   $('#home').onclick=()=>{$('#intro').classList.remove('closed');$('#hud').hidden=true;$('#hud').classList.remove('cinematic');started=false;tourActive=false;entryActive=false;zoneTravelActive=false;hasDestination=false;resetEntrance();stopAmbientMusic();stopGuideVoice()};
   $('#music-toggle').onclick=()=>musicOn?stopAmbientMusic():startAmbientMusic();
@@ -194,7 +195,7 @@ function animate(){
       const forward=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0)-joy.y;
       const side=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0)+joy.x;
       if(forward||side){hasDestination=false;scene.userData.clickMarker.visible=false;moveTarget.set(-Math.sin(yaw)*forward+Math.cos(yaw)*side,0,-Math.cos(yaw)*forward-Math.sin(yaw)*side);if(moveTarget.lengthSq()>1)moveTarget.normalize();moveTarget.multiplyScalar(7.4)}
-      else if(hasDestination){moveTarget.set(moveDestination.x-camera.position.x,0,moveDestination.z-camera.position.z);const distance=moveTarget.length();if(distance<.28){hasDestination=false;scene.userData.clickMarker.visible=false;moveTarget.set(0,0,0)}else{const desiredYaw=Math.atan2(-moveTarget.x,-moveTarget.z);yaw=dampAngle(yaw,desiredYaw,1-Math.exp(-7*dt));moveTarget.normalize().multiplyScalar(Math.min(7.2,Math.max(1.3,distance*2.7)))}}
+      else if(hasDestination){moveTarget.set(moveDestination.x-camera.position.x,0,moveDestination.z-camera.position.z);const distance=moveTarget.length();if(distance<.28){hasDestination=false;scene.userData.clickMarker.visible=false;moveTarget.set(0,0,0)}else{if(destinationTurnsView){const desiredYaw=Math.atan2(-moveTarget.x,-moveTarget.z);yaw=dampAngle(yaw,desiredYaw,1-Math.exp(-7*dt))}moveTarget.normalize().multiplyScalar(Math.min(7.2,Math.max(1.3,distance*2.7)))}}
       else moveTarget.set(0,0,0);
       moveVelocity.lerp(moveTarget,1-Math.exp(-(moveTarget.lengthSq()>.01?11:8)*dt));camera.position.addScaledVector(moveVelocity,dt);
       if(constrainWalkPosition(camera.position))moveVelocity.multiplyScalar(.22);
@@ -239,13 +240,18 @@ function updateFocus(){
   $('#crosshair').classList.toggle('active',!!hit);camera.userData.focus=hit?.object||null;
 }
 function activateCenter(){if(camera.userData.focus){const d=camera.userData.focus.userData;if(d.type==='curator')speakCurator();else openPoem(d.child,d.poem)}}
+function setMoveDestination(target,turnsView=true,showMarker=true){
+  moveDestination.copy(target);moveDestination.y=0;constrainWalkPosition(moveDestination);destinationTurnsView=turnsView;hasDestination=true;moveVelocity.multiplyScalar(.35);const marker=scene.userData.clickMarker;marker.position.set(moveDestination.x,.018,moveDestination.z);marker.visible=showMarker
+}
+function queueDirectionalMove(distance){
+  if(!Number.isFinite(distance)||Math.abs(distance)<.001)return;const direction=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw)),base=hasDestination&&!destinationTurnsView?moveDestination:camera.position,target=base.clone().addScaledVector(direction,distance);setMoveDestination(target,false,false)
+}
 function handleWorldClick(x,y){
   clickPoint.set(x/innerWidth*2-1,-(y/innerHeight)*2+1);raycaster.setFromCamera(clickPoint,camera);
   const subject=raycaster.intersectObjects(frameMeshes,false)[0];if(subject){const d=subject.object.userData;if(d.type==='curator')speakCurator();else openPoem(d.child,d.poem);return}
-  pitch=THREE.MathUtils.clamp(pitch+(.5-y/innerHeight)*.24,PITCH_MIN,PITCH_MAX);camera.rotation.x=pitch;raycaster.setFromCamera(clickPoint,camera);
-  const floorHit=raycaster.intersectObject(scene.userData.floor,false)[0];let usedOpenSpace=false;
-  if(floorHit)moveDestination.copy(floorHit.point);else{const direction=raycaster.ray.direction.clone();direction.y=0;if(direction.lengthSq()<.01)return;direction.normalize();moveDestination.copy(camera.position).addScaledVector(direction,6);usedOpenSpace=true}
-  moveDestination.y=0;constrainWalkPosition(moveDestination);hasDestination=true;moveVelocity.multiplyScalar(.35);const marker=scene.userData.clickMarker;marker.position.set(moveDestination.x,.018,moveDestination.z);marker.visible=true
+  if(y>innerHeight*.72){queueDirectionalMove(-4.2);return}
+  const floorHit=raycaster.intersectObject(scene.userData.floor,false)[0];
+  if(floorHit)setMoveDestination(floorHit.point,true,true);else{const direction=raycaster.ray.direction.clone();direction.y=0;if(direction.lengthSq()<.01)return;direction.normalize();setMoveDestination(camera.position.clone().addScaledVector(direction,6),true,true)}
 }
 function constrainWalkPosition(position){
   let adjusted=false,x=THREE.MathUtils.clamp(position.x,WALK_BOUNDS.minX,WALK_BOUNDS.maxX),z=THREE.MathUtils.clamp(position.z,WALK_BOUNDS.minZ,WALK_BOUNDS.maxZ);if(x!==position.x||z!==position.z)adjusted=true;position.x=x;position.z=z;
