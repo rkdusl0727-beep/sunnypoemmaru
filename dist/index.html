@@ -36,12 +36,10 @@
       </div>
     </header>
     <div id="crosshair" class="crosshair" aria-hidden="true"></div>
-    <p id="focus-hint" class="focus-hint">이 작품을 눌러 감상하기</p>
     <aside class="mini-map" aria-label="전시장 미니맵">
       <div id="map-dot" class="map-dot"></div><div id="map-view" class="map-view"></div>
       <span class="map-center" aria-hidden="true"></span><i class="map-ring"></i>
     </aside>
-    <div class="desktop-help"><span>바닥·빈 공간 클릭 이동 · 뒤를 보고 클릭하면 뒤로 이동</span><i></i><kbd>WASD</kbd><span>보조 이동</span></div>
     <div class="mobile-controls" aria-label="이동 조작">
       <div id="move-pad" class="move-pad" aria-label="방향 이동 버튼">
         <button class="move-forward" type="button" data-move="forward">앞</button>
@@ -49,22 +47,8 @@
         <button class="move-back" type="button" data-move="back">뒤</button>
         <button class="move-right" type="button" data-move="right">오른쪽</button>
       </div>
-      <div class="move-caption">버튼을 누르고 있으면 이동해요</div>
-      <div class="look-help"><strong>쉬운 이동</strong><br>뒤를 본 뒤 빈 곳을 눌러도 이동해요</div>
     </div>
   </main>
-
-  <section id="curator-panel" class="curator-panel" aria-hidden="true" aria-labelledby="curator-title">
-    <div class="curator-card">
-      <button id="curator-close" class="close-button" type="button" aria-label="큐레이터 안내 닫기"><img src="assets/ui-close.png" alt="" aria-hidden="true"></button>
-      <img class="curator-face" src="assets/curator-maru.png" alt="" aria-hidden="true">
-      <p class="curator-role">3D 전시 큐레이터 · 마루</p>
-      <h2 id="curator-title">반가워요! 전시를 안내할게요.</h2>
-      <p>이곳에는 열 명의 어린이가 쓴 동시가 다섯 편씩 전시되어 있어요. 바닥이나 빈 공간을 클릭하면 바라보는 방향으로 이동하고, 액자 앞에서는 편안한 감상 거리가 자동으로 유지돼요.</p>
-      <div class="curator-tips"><span><b>1</b> 바닥·빈 공간을 클릭해 이동하기</span><span><b>2</b> 뒤를 보고 클릭하면 뒤로 이동</span><span><b>3</b> 작품을 클릭해 감상하기</span></div>
-      <button id="curator-overview" class="curator-action" type="button">정면 입구에서 둘러보기</button>
-    </div>
-  </section>
 
   <section id="poem-modal" class="poem-modal" aria-hidden="true" aria-labelledby="poem-title">
     <div class="modal-shade" data-close></div>
@@ -83,8 +67,6 @@
     <div id="index-list" class="index-list"></div>
     <p class="data-note">현재 이름·제목·본문은 실제 작품을 넣기 전의 교체용 문구입니다.</p>
   </aside>
-  <div id="rotate-note" class="rotate-note">가로로 돌리면 전시장을 더 넓게 볼 수 있어요</div>
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script type="module" src="app.js"></script>
 </body>
 </html>
