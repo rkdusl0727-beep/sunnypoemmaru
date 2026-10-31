@@ -5,7 +5,7 @@ const children=Array.from({length:10},(_,i)=>({id:i+1,name:`어린이 ${String(i
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const canvas=$('#gallery-canvas');
 let scene,camera,renderer,clock,raycaster,frameMeshes=[],yaw=0,pitch=0,started=false,modalOpen=false,overviewMode=false;
-let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,lastX=0,lastY=0,keys={},joy={x:0,y:0};
+let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,lastX=0,lastY=0,keys={},joy={x:0,y:0},mouseDrive={x:0,y:0,active:false};
 let audioContext,audioMaster,musicTimer,musicStep=0,musicOn=true;
 const coarsePointer=matchMedia('(pointer:coarse)').matches||innerWidth<800,moveVelocity=new THREE.Vector3(),moveTarget=new THREE.Vector3(),curatorTarget=new THREE.Vector3();
 const cameraPos=new THREE.Vector3(0,1.65,5.3);
@@ -128,10 +128,11 @@ function bind(){
   addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key==='Escape'){closePoem();closeIndex();closeCurator()}});
   addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
   canvas.addEventListener('pointerdown',e=>{if(!started||modalOpen)return;dragging=true;dragMoved=false;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId)});
-  canvas.addEventListener('pointermove',e=>{if(!dragging||modalOpen)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;if(Math.abs(dx)+Math.abs(dy)>3)dragMoved=true;yaw-=dx*.0042;pitch=Math.max(-.78,Math.min(.72,pitch-dy*.0034));lastX=e.clientX;lastY=e.clientY});
+  canvas.addEventListener('pointermove',e=>{if(!started||modalOpen)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;if(dragging&&Math.abs(dx)+Math.abs(dy)>3)dragMoved=true;if(coarsePointer){if(!dragging)return;yaw-=dx*.0042;pitch=Math.max(-.78,Math.min(.72,pitch-dy*.0034));lastX=e.clientX;lastY=e.clientY;return}mouseDrive.x=Math.max(-1,Math.min(1,e.clientX/innerWidth*2-1));mouseDrive.y=Math.max(-1,Math.min(1,e.clientY/innerHeight*2-1));mouseDrive.active=true;lastX=e.clientX;lastY=e.clientY});
+  canvas.addEventListener('pointerleave',()=>{if(!coarsePointer)mouseDrive.active=false});
   canvas.addEventListener('pointerup',()=>{if(dragging&&!dragMoved)activateCenter();dragging=false});
-  $('#enter').onclick=()=>{started=true;$('#intro').classList.add('closed');$('#hud').hidden=false;showOverview();startAmbientMusic();showToast('정면에서 전시장을 자유롭게 둘러보세요')};
-  $('#home').onclick=()=>{$('#intro').classList.remove('closed');$('#hud').hidden=true;started=false;stopAmbientMusic()};
+  $('#enter').onclick=()=>{started=true;$('#intro').classList.add('closed');$('#hud').hidden=false;showOverview();startAmbientMusic();showToast(coarsePointer?'방향 버튼으로 이동하고 화면을 밀어 둘러보세요':'마우스를 위·아래·좌우로 옮겨 이동하세요. 가운데 두면 멈춰요')};
+  $('#home').onclick=()=>{$('#intro').classList.remove('closed');$('#hud').hidden=true;started=false;mouseDrive.active=false;stopAmbientMusic()};
   $('#music-toggle').onclick=()=>musicOn?stopAmbientMusic():startAmbientMusic();
   $('#overview').onclick=showOverview;$('#index-open').onclick=openIndex;$('#index-close').onclick=closeIndex;
   $('#curator-close').onclick=closeCurator;$('#curator-overview').onclick=()=>{closeCurator();showOverview()};
@@ -146,7 +147,9 @@ function bindJoystick(){
 function animate(){
   requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);
   if(started&&!modalOpen){
-    const forward=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0)-joy.y;
+    const dead=.18,mx=mouseDrive.active&&!coarsePointer&&Math.abs(mouseDrive.x)>dead?Math.sign(mouseDrive.x)*(Math.abs(mouseDrive.x)-dead)/(1-dead):0,my=mouseDrive.active&&!coarsePointer&&Math.abs(mouseDrive.y)>dead?-Math.sign(mouseDrive.y)*(Math.abs(mouseDrive.y)-dead)/(1-dead):0;
+    yaw-=mx*1.55*dt;
+    const forward=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0)-joy.y+my;
     const side=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0)+joy.x;
     moveTarget.set(-Math.sin(yaw)*forward+Math.cos(yaw)*side,0,-Math.cos(yaw)*forward-Math.sin(yaw)*side);
     if(moveTarget.lengthSq()>1)moveTarget.normalize();moveTarget.multiplyScalar(7.4);
@@ -198,7 +201,7 @@ function updateMap(){const x=camera.position.x/15*40,z=camera.position.z/15*40;$
 function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,coarsePointer?1:1.25))}
 
 function openPoem(ci,pi){
-  moveVelocity.set(0,0,0);
+  moveVelocity.set(0,0,0);mouseDrive.active=false;
   selectedChild=ci;selectedPoem=pi;modalOpen=true;const c=children[ci],p=c.poems[pi];
   visited.add(`${ci}-${pi}`);localStorage.setItem('galleryVisited',JSON.stringify([...visited]));
   $('.poem-card').style.setProperty('--accent',c.color);$('#poem-child').textContent=c.name;$('#poem-number').textContent=`작품 ${pi+1} / 5`;
@@ -209,7 +212,7 @@ function closePoem(){modalOpen=false;$('#poem-modal').classList.remove('open');$
 function movePoem(step){selectedPoem=(selectedPoem+step+5)%5;openPoem(selectedChild,selectedPoem)}
 function openIndex(){modalOpen=true;$('#index-panel').classList.add('open');$('#index-panel').setAttribute('aria-hidden','false')}
 function closeIndex(){modalOpen=false;$('#index-panel').classList.remove('open');$('#index-panel').setAttribute('aria-hidden','true')}
-function openCurator(){moveVelocity.set(0,0,0);modalOpen=true;$('#curator-panel').classList.add('open');$('#curator-panel').setAttribute('aria-hidden','false');setTimeout(()=>$('#curator-close').focus(),200)}
+function openCurator(){moveVelocity.set(0,0,0);mouseDrive.active=false;modalOpen=true;$('#curator-panel').classList.add('open');$('#curator-panel').setAttribute('aria-hidden','false');setTimeout(()=>$('#curator-close').focus(),200)}
 function closeCurator(){modalOpen=false;$('#curator-panel').classList.remove('open');$('#curator-panel').setAttribute('aria-hidden','true')}
 function buildIndex(){
   const root=$('#index-list');
