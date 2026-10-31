@@ -301,7 +301,7 @@ function openSettings(){if(!adminMode)return;closeIndex();closePoem();modalOpen=
 function closeSettings(){if(!adminMode)return;modalOpen=false;$('#settings-panel').classList.remove('open');$('#settings-panel').setAttribute('aria-hidden','true')}
 function getNaturalKoreanVoice(){
   if(!('speechSynthesis' in window))return null;const voices=speechSynthesis.getVoices(),korean=voices.filter(v=>/^ko([-_]|$)/i.test(v.lang));
-  return korean.find(v=>/sandy|flo|eddy|shelley/i.test(v.name))||korean.find(v=>/natural|premium|enhanced|yuna|sunhi|sora|heami|google|microsoft/i.test(v.name))||korean[0]||null
+  return korean.find(v=>/yuna|natural|premium|enhanced|sunhi|sora|heami|google|microsoft/i.test(v.name))||korean[0]||null
 }
 function speakCurator(attempt=0){
   if(guideAudioSource||guideUtterance||guideAudioPending)return;if(audioContext){guideAudioPending=true;prepareGuideAudio().then(buffer=>{guideAudioPending=false;if(!started||entryActive||tourActive)return;moveVelocity.set(0,0,0);hasDestination=false;scene.userData.clickMarker.visible=false;guideAudioSource=audioContext.createBufferSource();const gain=audioContext.createGain();guideAudioSource.buffer=buffer;gain.gain.value=.9;guideAudioSource.connect(gain).connect(audioContext.destination);if(audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.012,audioContext.currentTime+.35);guideAudioSource.onended=()=>{guideAudioSource=null;if(audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.055,audioContext.currentTime+.8)};audioContext.resume();guideAudioSource.start()}).catch(()=>{guideAudioPending=false;speakBrowserVoice(attempt)});return}speakBrowserVoice(attempt)
@@ -312,8 +312,8 @@ function prepareGuideAudio(){
 function speakBrowserVoice(attempt=0){
   if(!('speechSynthesis' in window)||guideUtterance||speechSynthesis.speaking)return;const voice=getNaturalKoreanVoice();if(!voice){if(attempt<8)setTimeout(()=>{if(started&&!entryActive&&!tourActive)speakBrowserVoice(attempt+1)},250);return}
   moveVelocity.set(0,0,0);hasDestination=false;scene.userData.clickMarker.visible=false;
-  const line='안녕하세요. 저는 전시 안내를 맡은 마루예요. 바닥을 클릭하면 원하는 곳으로 이동할 수 있어요. 화면을 가로로 드래그하면 주변을 둘러볼 수 있고, 마우스 휠이나 세로 드래그로 앞뒤로 움직일 수 있어요. 원목 액자를 누르면 아이들의 동시 원본을 감상할 수 있어요. 천천히 둘러보세요.';
-  guideUtterance=new SpeechSynthesisUtterance(line);guideUtterance.voice=voice;guideUtterance.lang='ko-KR';guideUtterance.rate=.86;guideUtterance.pitch=1.08;guideUtterance.volume=.86;if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.014,audioContext.currentTime+.35);const finish=()=>{guideUtterance=null;if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.055,audioContext.currentTime+.8)};guideUtterance.onend=finish;guideUtterance.onerror=finish;speechSynthesis.speak(guideUtterance)
+  const line='안녕! 나는 전시를 안내하는 마루야. 바닥을 클릭하면 원하는 곳으로 갈 수 있어. 화면을 가로로 천천히 드래그하면 주변을 둘러볼 수 있고, 마우스 휠이나 세로 드래그로 앞뒤로 움직일 수 있어. 원목 액자를 누르면 친구들이 쓴 동시 원본을 볼 수 있어. 편하게, 천천히 둘러봐.';
+  guideUtterance=new SpeechSynthesisUtterance(line);guideUtterance.voice=voice;guideUtterance.lang='ko-KR';guideUtterance.rate=.88;guideUtterance.pitch=1.04;guideUtterance.volume=.86;if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.014,audioContext.currentTime+.35);const finish=()=>{guideUtterance=null;if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.055,audioContext.currentTime+.8)};guideUtterance.onend=finish;guideUtterance.onerror=finish;speechSynthesis.speak(guideUtterance)
 }
 function stopGuideVoice(){if('speechSynthesis' in window)speechSynthesis.cancel();guideUtterance=null;guideAudioPending=false;if(guideAudioSource){const source=guideAudioSource;guideAudioSource=null;try{source.stop()}catch{}}if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.055,audioContext.currentTime+.4)}
 function showPoemScan(ci,pi){
