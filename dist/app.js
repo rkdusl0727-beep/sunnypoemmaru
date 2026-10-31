@@ -15,6 +15,7 @@ const zoneTravelStart=new THREE.Vector3(),zoneTravelEnd=new THREE.Vector3();
 const TOUR_DURATION=10;
 const ENTRY_DURATION=3.6;
 const ZONE_TRAVEL_DURATION=1.55;
+const PITCH_MIN=-.24,PITCH_MAX=.42;
 let zoneTravelStartAngle=0,zoneTravelAngleDelta=0,zoneTravelStartRadius=0,zoneTravelEndRadius=0,zoneTravelStartYaw=0,zoneTravelEndYaw=0,zoneTravelChild=0;
 const WALK_BOUNDS={minX:-11.55,maxX:11.55,minZ:-9.7,maxZ:10};
 const SAFE_ZONES=[{x:0,z:0,r:3.35}];
@@ -146,9 +147,10 @@ function bind(){
   addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key==='Escape'){closePoem();closeIndex();stopGuideVoice()}});
   addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
   canvas.addEventListener('pointerdown',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;dragging=true;dragMoved=false;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId)});
-  canvas.addEventListener('pointermove',e=>{if(!started||modalOpen||tourActive||entryActive||!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;if(Math.abs(dx)+Math.abs(dy)>3)dragMoved=true;yaw-=dx*.0042;pitch=Math.max(-.78,Math.min(.72,pitch-dy*.0034));lastX=e.clientX;lastY=e.clientY});
+  canvas.addEventListener('pointermove',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive||!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;if(Math.abs(dx)+Math.abs(dy)>3)dragMoved=true;yaw-=dx*.0042;pitch=THREE.MathUtils.clamp(pitch-dy*.0034,PITCH_MIN,PITCH_MAX);lastX=e.clientX;lastY=e.clientY});
   canvas.addEventListener('pointerleave',()=>{dragging=false});
   canvas.addEventListener('pointerup',e=>{if(dragging&&!dragMoved)handleWorldClick(e.clientX,e.clientY);dragging=false});
+  canvas.addEventListener('wheel',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;e.preventDefault();pitch=THREE.MathUtils.clamp(pitch-e.deltaY*.00075,PITCH_MIN,PITCH_MAX);camera.rotation.x=pitch},{passive:false});
   $('#enter').onclick=()=>{started=true;$('#intro').classList.add('closed');$('#hud').hidden=false;startAmbientMusic();startEntrySequence()};
   $('#home').onclick=()=>{$('#intro').classList.remove('closed');$('#hud').hidden=true;$('#hud').classList.remove('cinematic');started=false;tourActive=false;entryActive=false;zoneTravelActive=false;hasDestination=false;resetEntrance();stopAmbientMusic();stopGuideVoice()};
   $('#music-toggle').onclick=()=>musicOn?stopAmbientMusic():startAmbientMusic();
@@ -216,6 +218,7 @@ function activateCenter(){if(camera.userData.focus){const d=camera.userData.focu
 function handleWorldClick(x,y){
   clickPoint.set(x/innerWidth*2-1,-(y/innerHeight)*2+1);raycaster.setFromCamera(clickPoint,camera);
   const subject=raycaster.intersectObjects(frameMeshes,false)[0];if(subject){const d=subject.object.userData;if(d.type==='curator')speakCurator();else openPoem(d.child,d.poem);return}
+  pitch=THREE.MathUtils.clamp(pitch+(.5-y/innerHeight)*.24,PITCH_MIN,PITCH_MAX);camera.rotation.x=pitch;raycaster.setFromCamera(clickPoint,camera);
   const floorHit=raycaster.intersectObject(scene.userData.floor,false)[0];let usedOpenSpace=false;
   if(floorHit)moveDestination.copy(floorHit.point);else{const direction=raycaster.ray.direction.clone();direction.y=0;if(direction.lengthSq()<.01)return;direction.normalize();moveDestination.copy(camera.position).addScaledVector(direction,6);usedOpenSpace=true}
   moveDestination.y=0;constrainWalkPosition(moveDestination);hasDestination=true;moveVelocity.multiplyScalar(.35);const marker=scene.userData.clickMarker;marker.position.set(moveDestination.x,.018,moveDestination.z);marker.visible=true
