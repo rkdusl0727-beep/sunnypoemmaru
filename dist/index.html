@@ -32,6 +32,7 @@
       <div class="top-actions">
         <button id="music-toggle" class="music-button" type="button" aria-label="전시 음악 끄기" aria-pressed="true"><img class="music-icon" src="assets/ui-music.png" alt="" aria-hidden="true"><span>음악</span></button>
         <button id="overview" class="icon-button" type="button" aria-label="정면 입구 시점으로 이동"><img class="button-icon" src="assets/ui-overview.png" alt="" aria-hidden="true"></button>
+        <button id="settings-open" class="icon-button settings-button" type="button" aria-label="원본 스캔 설정">설정</button>
         <button id="index-open" class="icon-button" type="button" aria-label="전체 작품 목록"><img class="button-icon" src="assets/ui-menu.png" alt="" aria-hidden="true"></button>
       </div>
     </header>
@@ -55,9 +56,10 @@
     <article class="poem-card">
       <button class="modal-close close-button" type="button" data-close aria-label="작품 닫기"><img src="assets/ui-close.png" alt="" aria-hidden="true"></button>
       <div class="poem-meta"><span id="poem-dot"></span><p>작은 시인<br><strong id="poem-child"></strong></p><em id="poem-number"></em></div>
-      <div class="placeholder-badge">실제 작품 교체 전 예시 문구</div>
+      <div id="poem-placeholder-badge" class="placeholder-badge">실제 작품 교체 전 예시 문구</div>
       <h2 id="poem-title"></h2>
-      <div class="poem-body-card"><p id="poem-body"></p><img class="poem-bead" src="assets/ui-poem-bead.png" alt="" aria-hidden="true"></div>
+      <img id="poem-scan" class="poem-scan" alt="" hidden>
+      <div id="poem-placeholder-content" class="poem-body-card"><p id="poem-body"></p><img class="poem-bead" src="assets/ui-poem-bead.png" alt="" aria-hidden="true"></div>
       <footer><button id="prev-poem" type="button"><img class="nav-arrow" src="assets/ui-arrow-left.png" alt="" aria-hidden="true">이전 작품</button><button id="next-poem" type="button">다음 작품<img class="nav-arrow" src="assets/ui-arrow-right.png" alt="" aria-hidden="true"></button></footer>
     </article>
   </section>
@@ -66,6 +68,13 @@
     <header><div><small>전체 작품</small><h2 id="index-title">50개의 작은 우주</h2></div><button id="index-close" class="close-button" type="button" aria-label="목록 닫기"><img src="assets/ui-close.png" alt="" aria-hidden="true"></button></header>
     <div id="index-list" class="index-list"></div>
     <p class="data-note">현재 이름·제목·본문은 실제 작품을 넣기 전의 교체용 문구입니다.</p>
+  </aside>
+
+  <aside id="settings-panel" class="settings-panel" aria-hidden="true" aria-labelledby="settings-title">
+    <header><div><small>전시 편집</small><h2 id="settings-title">동시 원본 스캔 설정</h2></div><button id="settings-close" class="close-button" type="button" aria-label="설정 닫기"><img src="assets/ui-close.png" alt="" aria-hidden="true"></button></header>
+    <p class="settings-note">아이별 동시 5편의 스캔 이미지를 넣으세요. PNG·JPG 파일의 전체 원본이 잘리지 않게 표시되며, 이 기기의 브라우저에만 저장됩니다.</p>
+    <div id="scan-status" class="scan-status" role="status" aria-live="polite"></div>
+    <div id="settings-list" class="settings-list"></div>
   </aside>
   <script type="module" src="app.js"></script>
 </body>

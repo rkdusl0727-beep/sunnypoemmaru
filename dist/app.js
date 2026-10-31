@@ -26,6 +26,9 @@ const ZONE_LAYOUT=[
 ];
 const visited=new Set(JSON.parse(localStorage.getItem('galleryVisited')||'[]'));
 const poemPngTextures=new Map();
+const poemArtMeshes=new Map(),scanRecords=new Map();
+const SCAN_DB_NAME='sunny-poem-original-scans',SCAN_STORE='scans';
+let scanDbPromise=null,activeScanUrl=null;
 
 function init(){
   THREE.Cache.enabled=true;
@@ -39,7 +42,7 @@ function init(){
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.18;
   renderer.shadowMap.enabled=!coarsePointer;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   clock=new THREE.Clock();raycaster=new THREE.Raycaster();
-  buildGallery();bind();buildIndex();renderer.compile(scene,camera);if(renderer.shadowMap.enabled){renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true}animate();
+  buildGallery();bind();buildIndex();buildSettings();loadStoredScans();renderer.compile(scene,camera);if(renderer.shadowMap.enabled){renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true}animate();
   setTimeout(()=>$('#loading').classList.add('done'),450);
 }
 
@@ -84,7 +87,7 @@ function buildZone(ci){
   c.poems.forEach((p,pi)=>{
     const framedArt=new THREE.Group();framedArt.position.set((pi-2)*1.4,2.55,.22);
     const frameBody=new THREE.Mesh(new THREE.BoxGeometry(1.06,1.62,.16),scene.userData.frameSideMaterial);frameBody.castShadow=renderer.shadowMap.enabled;framedArt.add(frameBody);
-    const art=new THREE.Mesh(new THREE.PlaneGeometry(.88,1.36),new THREE.MeshStandardMaterial({map:makePoemPngTexture(ci,pi),roughness:.48,emissive:new THREE.Color(c.color),emissiveIntensity:.045,side:THREE.DoubleSide}));art.position.z=.086;art.userData={type:'poem',child:ci,poem:pi};frameMeshes.push(art);framedArt.add(art);
+    const art=new THREE.Mesh(new THREE.PlaneGeometry(.88,1.36),new THREE.MeshStandardMaterial({map:makePoemPngTexture(ci,pi),roughness:.48,emissive:new THREE.Color(c.color),emissiveIntensity:.045,side:THREE.DoubleSide}));art.position.z=.086;art.userData={type:'poem',child:ci,poem:pi};frameMeshes.push(art);poemArtMeshes.set(`${ci}-${pi}`,art);framedArt.add(art);
     const frame=new THREE.Mesh(new THREE.PlaneGeometry(1.08,1.64),new THREE.MeshBasicMaterial({map:scene.userData.frameTexture,transparent:true,alphaTest:.035,depthWrite:false,toneMapped:true,side:THREE.DoubleSide}));frame.position.z=.098;frame.renderOrder=2;framedArt.add(frame);zone.add(framedArt);
   });
   const glowPos=zoneLocalToWorld(layout,0,2.2);const zoneGlow=new THREE.PointLight(c.color,.38,6,2);zoneGlow.position.set(glowPos.x,3.6,glowPos.z);scene.add(zoneGlow);
@@ -141,7 +144,7 @@ function makePngSprite(url,width,height,position,floatAmount=0,phase=0){
 
 function bind(){
   addEventListener('resize',resize);
-  addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key==='Escape'){closePoem();closeIndex();stopGuideVoice()}});
+  addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key==='Escape'){closePoem();closeIndex();closeSettings();stopGuideVoice()}});
   addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
   canvas.addEventListener('pointerdown',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;dragging=true;dragMoved=false;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId)});
   canvas.addEventListener('pointermove',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive||!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;if(Math.abs(dx)+Math.abs(dy)>3)dragMoved=true;yaw-=dx*.0042;pitch=THREE.MathUtils.clamp(pitch-dy*.0034,PITCH_MIN,PITCH_MAX);lastX=e.clientX;lastY=e.clientY});
@@ -151,7 +154,7 @@ function bind(){
   $('#enter').onclick=()=>{started=true;$('#intro').classList.add('closed');$('#hud').hidden=false;startAmbientMusic();startEntrySequence()};
   $('#home').onclick=()=>{$('#intro').classList.remove('closed');$('#hud').hidden=true;$('#hud').classList.remove('cinematic');started=false;tourActive=false;entryActive=false;zoneTravelActive=false;hasDestination=false;resetEntrance();stopAmbientMusic();stopGuideVoice()};
   $('#music-toggle').onclick=()=>musicOn?stopAmbientMusic():startAmbientMusic();
-  $('#overview').onclick=showOverview;$('#index-open').onclick=openIndex;$('#index-close').onclick=closeIndex;
+  $('#overview').onclick=showOverview;$('#index-open').onclick=openIndex;$('#index-close').onclick=closeIndex;$('#settings-open').onclick=openSettings;$('#settings-close').onclick=closeSettings;
   $$('[data-close]').forEach(b=>b.onclick=closePoem);
   $('#prev-poem').onclick=()=>movePoem(-1);$('#next-poem').onclick=()=>movePoem(1);bindJoystick();
 }
@@ -257,13 +260,15 @@ function openPoem(ci,pi){
   selectedChild=ci;selectedPoem=pi;modalOpen=true;const c=children[ci],p=c.poems[pi];
   visited.add(`${ci}-${pi}`);localStorage.setItem('galleryVisited',JSON.stringify([...visited]));
   $('.poem-card').style.setProperty('--accent',c.color);$('#poem-child').textContent=c.name;$('#poem-number').textContent=`작품 ${pi+1} / 5`;
-  $('#poem-title').textContent=p.title;$('#poem-body').textContent=p.body;$('#poem-modal').classList.add('open');$('#poem-modal').setAttribute('aria-hidden','false');
+  $('#poem-title').textContent=p.title;$('#poem-body').textContent=p.body;showPoemScan(ci,pi);$('#poem-modal').classList.add('open');$('#poem-modal').setAttribute('aria-hidden','false');
   setTimeout(()=>$('.modal-close').focus(),250);
 }
-function closePoem(){modalOpen=false;$('#poem-modal').classList.remove('open');$('#poem-modal').setAttribute('aria-hidden','true')}
+function closePoem(){modalOpen=false;$('#poem-modal').classList.remove('open');$('#poem-modal').setAttribute('aria-hidden','true');if(activeScanUrl){URL.revokeObjectURL(activeScanUrl);activeScanUrl=null}}
 function movePoem(step){selectedPoem=(selectedPoem+step+5)%5;openPoem(selectedChild,selectedPoem)}
 function openIndex(){modalOpen=true;$('#index-panel').classList.add('open');$('#index-panel').setAttribute('aria-hidden','false')}
 function closeIndex(){modalOpen=false;$('#index-panel').classList.remove('open');$('#index-panel').setAttribute('aria-hidden','true')}
+function openSettings(){closeIndex();closePoem();modalOpen=true;$('#settings-panel').classList.add('open');$('#settings-panel').setAttribute('aria-hidden','false');setTimeout(()=>$('#settings-close').focus(),220)}
+function closeSettings(){modalOpen=false;$('#settings-panel').classList.remove('open');$('#settings-panel').setAttribute('aria-hidden','true')}
 function getNaturalKoreanVoice(){
   if(!('speechSynthesis' in window))return null;const voices=speechSynthesis.getVoices(),korean=voices.filter(v=>/^ko([-_]|$)/i.test(v.lang));
   return korean.find(v=>/natural|premium|enhanced|yuna|sunhi|sora|heami|google/i.test(v.name))||null
@@ -275,6 +280,38 @@ function speakCurator(){
   guideUtterance=new SpeechSynthesisUtterance(line);guideUtterance.voice=voice;guideUtterance.lang='ko-KR';guideUtterance.rate=.88;guideUtterance.pitch=.96;guideUtterance.volume=.82;if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.018,audioContext.currentTime+.35);const finish=()=>{guideUtterance=null;if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.055,audioContext.currentTime+.8)};guideUtterance.onend=finish;guideUtterance.onerror=finish;speechSynthesis.speak(guideUtterance)
 }
 function stopGuideVoice(){if('speechSynthesis' in window)speechSynthesis.cancel();guideUtterance=null;if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.055,audioContext.currentTime+.4)}
+function showPoemScan(ci,pi){
+  const record=scanRecords.get(`${ci}-${pi}`),scan=$('#poem-scan'),placeholder=$('#poem-placeholder-content'),badge=$('#poem-placeholder-badge');if(activeScanUrl){URL.revokeObjectURL(activeScanUrl);activeScanUrl=null}
+  if(!record){scan.hidden=true;scan.removeAttribute('src');placeholder.hidden=false;badge.hidden=false;return}
+  activeScanUrl=URL.createObjectURL(record.originalBlob);scan.src=activeScanUrl;scan.alt=`${children[ci].name}의 ${pi+1}번째 동시 원본 스캔`;scan.hidden=false;placeholder.hidden=true;badge.hidden=true
+}
+function buildSettings(){
+  const root=$('#settings-list');children.forEach((child,ci)=>{const section=document.createElement('section');section.className='scan-child';section.innerHTML=`<h3><i style="--c:${child.color}"></i>${child.name}<span>동시 5편</span></h3><div class="scan-grid">${child.poems.map((poem,pi)=>{const key=`${ci}-${pi}`;return `<article class="scan-slot" data-scan-slot="${key}"><div><strong>${pi+1}. ${poem.title}</strong><span class="scan-file-name">원본 없음</span></div><div class="scan-actions"><label>스캔 선택<input type="file" accept="image/png,image/jpeg,image/webp" data-scan-input="${key}"></label><button type="button" data-scan-remove="${key}" hidden>삭제</button></div></article>`}).join('')}</div>`;root.append(section)});
+  $$('[data-scan-input]').forEach(input=>input.onchange=async()=>{const file=input.files?.[0],key=input.dataset.scanInput;input.value='';if(!file)return;const [ci,pi]=key.split('-').map(Number);try{setScanStatus(`${children[ci].name}의 ${pi+1}번째 원본을 준비하고 있어요.`);const record=await createScanRecord(key,ci,pi,file);await putScanRecord(record);scanRecords.set(key,record);applyScanTexture(record);updateScanSlot(record);if(selectedChild===ci&&selectedPoem===pi&&$('#poem-modal').classList.contains('open'))showPoemScan(ci,pi);setScanStatus(`${children[ci].name}의 ${pi+1}번째 원본을 저장했어요.`)}catch(error){setScanStatus(error?.message||'스캔 파일을 저장하지 못했어요.',true)}});
+  $$('[data-scan-remove]').forEach(button=>button.onclick=async()=>{const key=button.dataset.scanRemove,[ci,pi]=key.split('-').map(Number);try{await deleteScanRecord(key);scanRecords.delete(key);restorePlaceholderTexture(ci,pi);updateScanSlot({key,name:''});if(selectedChild===ci&&selectedPoem===pi&&$('#poem-modal').classList.contains('open'))showPoemScan(ci,pi);setScanStatus(`${children[ci].name}의 ${pi+1}번째 원본을 삭제했어요.`)}catch{setScanStatus('원본을 삭제하지 못했어요.',true)}})
+}
+function setScanStatus(message,isError=false){const status=$('#scan-status');status.textContent=message;status.classList.toggle('error',isError)}
+function openScanDb(){
+  if(scanDbPromise)return scanDbPromise;if(!('indexedDB' in window))return Promise.reject(new Error('이 브라우저에서는 원본 저장 기능을 사용할 수 없어요.'));
+  scanDbPromise=new Promise((resolve,reject)=>{const request=indexedDB.open(SCAN_DB_NAME,1);request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains(SCAN_STORE))db.createObjectStore(SCAN_STORE,{keyPath:'key'})};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)});return scanDbPromise
+}
+function requestResult(request){return new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)})}
+async function loadStoredScans(){
+  try{const db=await openScanDb(),records=await requestResult(db.transaction(SCAN_STORE,'readonly').objectStore(SCAN_STORE).getAll());records.forEach(record=>{scanRecords.set(record.key,record);applyScanTexture(record);updateScanSlot(record)});setScanStatus(records.length?`저장된 원본 ${records.length}개를 불러왔어요.`:'아직 등록된 원본 스캔이 없어요.')}catch(error){setScanStatus(error?.message||'저장된 원본을 불러오지 못했어요.',true)}
+}
+async function putScanRecord(record){const db=await openScanDb();await requestResult(db.transaction(SCAN_STORE,'readwrite').objectStore(SCAN_STORE).put(record))}
+async function deleteScanRecord(key){const db=await openScanDb();await requestResult(db.transaction(SCAN_STORE,'readwrite').objectStore(SCAN_STORE).delete(key))}
+function loadFileImage(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),image=new Image();image.onload=()=>{URL.revokeObjectURL(url);resolve(image)};image.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('스캔 이미지를 읽을 수 없어요.'))};image.src=url})}
+function canvasBlob(canvas,type='image/png'){return new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('PNG 이미지를 만들 수 없어요.')),type))}
+async function createScanRecord(key,ci,pi,file){
+  if(!/^image\/(png|jpeg|webp)$/i.test(file.type))throw new Error('PNG, JPG 또는 WEBP 스캔 이미지를 선택해 주세요.');if(file.size>25*1024*1024)throw new Error('스캔 파일은 한 장당 25MB 이하로 넣어 주세요.');
+  const image=await loadFileImage(file),canvas=document.createElement('canvas');canvas.width=640;canvas.height=990;const ctx=canvas.getContext('2d');ctx.fillStyle='#fffaf0';ctx.fillRect(0,0,canvas.width,canvas.height);const margin=28,scale=Math.min((canvas.width-margin*2)/image.naturalWidth,(canvas.height-margin*2)/image.naturalHeight),w=image.naturalWidth*scale,h=image.naturalHeight*scale;ctx.drawImage(image,(canvas.width-w)/2,(canvas.height-h)/2,w,h);const displayBlob=await canvasBlob(canvas);return{key,ci,pi,name:file.name,originalBlob:file,displayBlob,width:image.naturalWidth,height:image.naturalHeight,updatedAt:Date.now()}
+}
+function applyScanTexture(record){
+  const mesh=poemArtMeshes.get(record.key);if(!mesh)return;const url=URL.createObjectURL(record.displayBlob),texture=new THREE.TextureLoader().load(url,()=>URL.revokeObjectURL(url));texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),coarsePointer?2:4);texture.userData={format:'image/png',source:'original-scan-display'};mesh.material.map=texture;mesh.material.needsUpdate=true
+}
+function restorePlaceholderTexture(ci,pi){const mesh=poemArtMeshes.get(`${ci}-${pi}`);if(!mesh)return;mesh.material.map=makePoemPngTexture(ci,pi);mesh.material.needsUpdate=true}
+function updateScanSlot(record){const slot=$(`[data-scan-slot="${record.key}"]`);if(!slot)return;const hasFile=!!record.name;slot.classList.toggle('filled',hasFile);slot.querySelector('.scan-file-name').textContent=hasFile?record.name:'원본 없음';slot.querySelector('[data-scan-remove]').hidden=!hasFile}
 function buildIndex(){
   const root=$('#index-list');
   children.forEach((c,ci)=>{
