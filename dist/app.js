@@ -7,8 +7,7 @@ const canvas=$('#gallery-canvas');
 let scene,camera,renderer,clock,raycaster,frameMeshes=[],yaw=0,pitch=0,started=false,modalOpen=false,overviewMode=false;
 let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,lastX=0,lastY=0,keys={},joy={x:0,y:0};
 let audioContext,audioMaster,musicTimer,musicStep=0,musicOn=true;
-const coarsePointer=matchMedia('(pointer:coarse)').matches||innerWidth<800,moveVelocity=new THREE.Vector3(),moveTarget=new THREE.Vector3();
-let lastCurtainUpdate=0;
+const coarsePointer=matchMedia('(pointer:coarse)').matches||innerWidth<800,moveVelocity=new THREE.Vector3(),moveTarget=new THREE.Vector3(),curatorTarget=new THREE.Vector3();
 const cameraPos=new THREE.Vector3(0,1.65,5.3);
 const visited=new Set(JSON.parse(localStorage.getItem('galleryVisited')||'[]'));
 
@@ -30,10 +29,7 @@ function init(){
 
 function buildGallery(){
   scene.userData.cottonTexture=makeCottonTexture();
-  scene.userData.woodTexture=makeWoodTexture();
-  scene.userData.frameMaterial=new THREE.MeshStandardMaterial({map:scene.userData.woodTexture,color:0xd6a06a,roughness:.78,metalness:0});
-  scene.userData.frameHGeo=new THREE.BoxGeometry(1.56,.13,.16);scene.userData.frameVGeo=new THREE.BoxGeometry(.13,1.82,.16);
-  scene.userData.curtainTexture=new THREE.TextureLoader().load('assets/breeze-curtains.png');scene.userData.curtainTexture.colorSpace=THREE.SRGBColorSpace;
+  scene.userData.frameTexture=new THREE.TextureLoader().load('assets/wood-frame-png.png');scene.userData.frameTexture.colorSpace=THREE.SRGBColorSpace;
   scene.add(new THREE.HemisphereLight(0xfff5dc,0xa66f45,2.6));
   scene.add(new THREE.AmbientLight(0xfff0d5,1.05));
   const floor=new THREE.Mesh(new THREE.CircleGeometry(15.2,96),new THREE.MeshStandardMaterial({color:0xc79768,roughness:.9,metalness:.01}));
@@ -50,7 +46,6 @@ function buildGallery(){
     const a=i/10*Math.PI*2;
     const panel=new THREE.Mesh(new THREE.BoxGeometry(8.2,5,.28),new THREE.MeshStandardMaterial({color:0xf1dfc3,roughness:.9}));placeOnRing(panel,a,15.02,2.55);panel.receiveShadow=true;scene.add(panel);
     const wood=new THREE.Mesh(new THREE.BoxGeometry(8.22,1.02,.32),new THREE.MeshStandardMaterial({color:0x9b6840,roughness:.85}));placeOnRing(wood,a,14.98,.53);scene.add(wood);
-    buildCottonCurtain(a+Math.PI/10);
   }
   const sun=new THREE.DirectionalLight(0xffcb88,3.2);sun.position.set(-8,12,5);sun.target.position.set(2,0,-2);sun.castShadow=renderer.shadowMap.enabled;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-18;sun.shadow.camera.right=18;sun.shadow.camera.top=18;sun.shadow.camera.bottom=-18;scene.add(sun,sun.target);
   const sunPatch=new THREE.Mesh(new THREE.CircleGeometry(5.4,48),new THREE.MeshBasicMaterial({color:0xffd699,transparent:true,opacity:.18,depthWrite:false}));sunPatch.rotation.x=-Math.PI/2;sunPatch.position.set(-3,.025,2);scene.add(sunPatch);
@@ -65,17 +60,6 @@ function makeCottonTexture(){
   x.globalAlpha=.14;x.strokeStyle='#bfae96';x.lineWidth=1;for(let i=0;i<256;i+=5){x.beginPath();x.moveTo(i,0);x.lineTo(i+8,256);x.stroke();x.beginPath();x.moveTo(0,i);x.lineTo(256,i+5);x.stroke()}
   const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(3,3);t.colorSpace=THREE.SRGBColorSpace;return t;
 }
-function makeWoodTexture(){
-  const c=document.createElement('canvas');c.width=512;c.height=256;const x=c.getContext('2d'),g=x.createLinearGradient(0,0,0,256);g.addColorStop(0,'#e0b17b');g.addColorStop(.5,'#bc7d49');g.addColorStop(1,'#d79c63');x.fillStyle=g;x.fillRect(0,0,512,256);
-  x.globalAlpha=.26;x.strokeStyle='#6f3e20';for(let i=0;i<46;i++){const y=i*6+Math.sin(i*.9)*5;x.beginPath();x.moveTo(0,y);for(let px=0;px<=512;px+=32)x.lineTo(px,y+Math.sin(px*.035+i)*3);x.stroke()}x.globalAlpha=1;
-  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(2,1);t.colorSpace=THREE.SRGBColorSpace;return t;
-}
-function buildCottonCurtain(angle){
-  const geo=new THREE.PlaneGeometry(4.6,3.45,12,10),pos=geo.attributes.position;geo.userData.base=Float32Array.from(pos.array);
-  const curtain=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({map:scene.userData.curtainTexture,transparent:true,alphaTest:.035,side:THREE.DoubleSide,depthWrite:false,toneMapped:true}));
-  placeOnRing(curtain,angle,14.72,3.55);curtain.renderOrder=2;curtain.userData.phase=angle*2;scene.add(curtain);(scene.userData.curtains??=[]).push(curtain);
-}
-
 function buildZone(ci){
   const base=ci/10*Math.PI*2,c=children[ci];
   const header=new THREE.Mesh(new THREE.PlaneGeometry(3.8,.95),new THREE.MeshBasicMaterial({map:makeTextTexture(c.name,'작은 시인의 방',c.color,1024,256),transparent:true}));
@@ -84,9 +68,8 @@ function buildZone(ci){
   placeOnRing(accent,base,14.72,3.84);scene.add(accent);
   c.poems.forEach((p,pi)=>{
     const angle=base+THREE.MathUtils.degToRad((pi-2)*5.7);
-    const frame=new THREE.Group(),woodMat=scene.userData.frameMaterial;
-    [[scene.userData.frameHGeo,0,.965],[scene.userData.frameHGeo,0,-.965],[scene.userData.frameVGeo,-.715,0],[scene.userData.frameVGeo,.715,0]].forEach(v=>{const rail=new THREE.Mesh(v[0],woodMat);rail.position.set(v[1],v[2],0);frame.add(rail)});
-    placeOnRing(frame,angle,14.78,2.55);scene.add(frame);
+    const frame=new THREE.Mesh(new THREE.PlaneGeometry(1.62,2.06),new THREE.MeshBasicMaterial({map:scene.userData.frameTexture,transparent:true,alphaTest:.035,depthWrite:false,toneMapped:true}));
+    placeOnRing(frame,angle,14.74,2.55);frame.renderOrder=2;scene.add(frame);
     const art=new THREE.Mesh(new THREE.PlaneGeometry(1.34,1.78),new THREE.MeshStandardMaterial({map:makePoemTexture(ci,pi),roughness:.48,emissive:new THREE.Color(c.color),emissiveIntensity:.045}));
     placeOnRing(art,angle,14.65,2.55);art.userData={type:'poem',child:ci,poem:pi};frameMeshes.push(art);scene.add(art);
   });
@@ -119,16 +102,10 @@ function buildCenterSculpture(){
   const light=new THREE.PointLight(0xffc77a,3.4,10,2);light.position.y=3.5;scene.add(light);
 }
 function buildPlant(angle,radius){
-  const g=new THREE.Group();const pot=new THREE.Mesh(new THREE.CylinderGeometry(.28,.38,.52,18),new THREE.MeshStandardMaterial({color:0xc6784e,roughness:.9}));pot.position.y=.27;g.add(pot);
-  const stem=new THREE.Mesh(new THREE.CylinderGeometry(.035,.045,1.35,8),new THREE.MeshStandardMaterial({color:0x557147,roughness:1}));stem.position.y=1.08;g.add(stem);
-  const leafMat=new THREE.MeshStandardMaterial({color:0x6f8d5b,roughness:.95});
-  [[-.26,1.3,0],[.25,1.55,.05],[-.18,1.8,.02]].forEach((v,i)=>{const leaf=new THREE.Mesh(new THREE.SphereGeometry(.27,12,8),leafMat);leaf.position.set(...v);leaf.scale.set(1,.45,.5);leaf.rotation.z=i%2?-.55:.55;g.add(leaf)});
-  g.position.set(Math.sin(angle)*radius,0,Math.cos(angle)*radius);g.rotation.y=angle+Math.PI;scene.add(g);
+  makePngSprite('assets/planter-png.png',1.12,1.42,[Math.sin(angle)*radius,.71,Math.cos(angle)*radius],.012,angle);
 }
 function buildCurator(){
-  const g=makePngSprite('assets/curator-maru.png',2.05,3.08,[3.4,1.53,3.2],.055);g.renderOrder=3;scene.userData.curator=g;
-  const hit=new THREE.Mesh(new THREE.CapsuleGeometry(.58,1.55,5,10),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));hit.position.set(3.4,1.2,3.2);hit.userData={type:'curator'};frameMeshes.push(hit);scene.add(hit);
-  const bubble=new THREE.Mesh(new THREE.PlaneGeometry(2.6,.9),new THREE.MeshBasicMaterial({map:makeTextTexture('안녕하세요!','저를 눌러 관람 안내를 받아보세요','#7b5538',900,300),transparent:true,depthTest:false}));bubble.position.set(3.4,3.08,3.18);bubble.lookAt(0,3.08,0);bubble.renderOrder=5;scene.add(bubble);
+  const g=makePngSprite('assets/curator-maru.png',1.28,1.92,[1.35,.98,6.7],0);g.renderOrder=4;g.userData.type='curator';scene.userData.curator=g;frameMeshes.push(g);
 }
 function buildWarmLights(){
   const lamps=new THREE.Group();for(let i=0;i<16;i++){const a=i/16*Math.PI*2;const bulb=new THREE.Mesh(new THREE.SphereGeometry(.08,10,8),new THREE.MeshStandardMaterial({color:0xffe0a0,emissive:0xe59d3f,emissiveIntensity:1.5}));bulb.position.set(Math.sin(a)*8.5,5.48,Math.cos(a)*8.5);lamps.add(bulb)}scene.add(lamps);
@@ -160,10 +137,8 @@ function bind(){
   $('#prev-poem').onclick=()=>movePoem(-1);$('#next-poem').onclick=()=>movePoem(1);bindJoystick();
 }
 function bindJoystick(){
-  const j=$('#joystick'),k=$('#joystick-knob');let active=false;
-  const move=e=>{if(!active)return;const r=j.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy,max=35,len=Math.hypot(dx,dy)||1,s=Math.min(1,max/len);joy.x=dx*s/max;joy.y=dy*s/max;k.style.transform=`translate(${dx*s}px,${dy*s}px)`};
-  j.addEventListener('pointerdown',e=>{active=true;j.setPointerCapture(e.pointerId);move(e)});j.addEventListener('pointermove',move);
-  j.addEventListener('pointerup',()=>{active=false;joy.x=joy.y=0;k.style.transform=''});
+  const values={forward:[0,-1],back:[0,1],left:[-1,0],right:[1,0]};
+  $$('[data-move]').forEach(button=>{const value=values[button.dataset.move],start=e=>{e.preventDefault();joy.x=value[0];joy.y=value[1];button.classList.add('pressed');button.setPointerCapture?.(e.pointerId)},stop=()=>{joy.x=joy.y=0;button.classList.remove('pressed')};button.addEventListener('pointerdown',start);button.addEventListener('pointerup',stop);button.addEventListener('pointercancel',stop);button.addEventListener('lostpointercapture',stop)});
 }
 
 function animate(){
@@ -179,8 +154,14 @@ function animate(){
     if(!overviewMode)camera.position.y=1.65;camera.rotation.set(pitch,yaw,0);updateZone();updateFocus();updateMap();
   }
   const now=performance.now()*.001;(scene.userData.animatedSprites||[]).forEach((sprite,i)=>{sprite.position.y=sprite.userData.baseY+Math.sin(now*1.25+sprite.userData.phase+i*.35)*sprite.userData.floatAmount;sprite.material.rotation=Math.sin(now*.7+sprite.userData.phase)*.008});
-  if(now-lastCurtainUpdate>.034){lastCurtainUpdate=now;(scene.userData.curtains||[]).forEach(curtain=>{const p=curtain.geometry.attributes.position,b=curtain.geometry.userData.base;for(let i=0;i<p.count;i++){const ix=i*3,x=b[ix],y=b[ix+1];p.setZ(i,b[ix+2]+Math.sin(now*1.15+curtain.userData.phase+y*1.25+x*.7)*(.045+(1.72-y)*.028));}p.needsUpdate=true;});}
+  updateCurator(dt,now);
   renderer.render(scene,camera);
+}
+
+function updateCurator(dt,now){
+  const curator=scene.userData.curator;if(!curator||!started)return;
+  curatorTarget.set(camera.position.x-Math.sin(yaw)*2.25+Math.cos(yaw)*1.25,1.02+Math.sin(now*2)*.035,camera.position.z-Math.cos(yaw)*2.25-Math.sin(yaw)*1.25);
+  const r=Math.hypot(curatorTarget.x,curatorTarget.z);if(r>12.1){curatorTarget.x*=12.1/r;curatorTarget.z*=12.1/r}curator.position.lerp(curatorTarget,1-Math.exp(-6.5*dt));
 }
 
 function startAmbientMusic(){

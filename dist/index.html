@@ -43,8 +43,14 @@
     </aside>
     <div class="desktop-help"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>이동</span><i></i><span>드래그하여 둘러보기</span></div>
     <div class="mobile-controls" aria-label="이동 조작">
-      <div id="joystick" class="joystick"><span id="joystick-knob"></span></div>
-      <div class="look-help">화면을 밀어<br>둘러보기</div>
+      <div id="move-pad" class="move-pad" aria-label="방향 이동 버튼">
+        <button class="move-forward" type="button" data-move="forward">앞</button>
+        <button class="move-left" type="button" data-move="left">왼쪽</button>
+        <button class="move-back" type="button" data-move="back">뒤</button>
+        <button class="move-right" type="button" data-move="right">오른쪽</button>
+      </div>
+      <div class="move-caption">버튼을 누르고 있으면 이동해요</div>
+      <div class="look-help"><strong>둘러보기</strong><br>빈 화면을 밀어보세요</div>
     </div>
   </main>
 
@@ -55,7 +61,7 @@
       <p class="curator-role">3D 전시 큐레이터 · 마루</p>
       <h2 id="curator-title">반가워요! 전시를 안내할게요.</h2>
       <p>이곳에는 열 명의 어린이가 쓴 동시가 다섯 편씩 전시되어 있어요. 벽면 액자 가까이 이동한 뒤 화면 중앙의 표시가 빛날 때 눌러보세요.</p>
-      <div class="curator-tips"><span><b>1</b> 드래그해 둘러보기</span><span><b>2</b> 이동해 작품에 다가가기</span><span><b>3</b> 액자를 눌러 감상하기</span></div>
+      <div class="curator-tips"><span><b>1</b> 빈 화면을 밀어 둘러보기</span><span><b>2</b> 방향 버튼으로 이동하기</span><span><b>3</b> 액자를 눌러 감상하기</span></div>
       <button id="curator-overview" class="curator-action" type="button">정면 입구에서 둘러보기</button>
     </div>
   </section>
