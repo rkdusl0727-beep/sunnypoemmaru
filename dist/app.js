@@ -38,9 +38,10 @@ function init(){
 }
 
 function buildGallery(){
-  scene.userData.cottonTexture=makeCottonTexture();
-  scene.userData.frameTexture=new THREE.TextureLoader().load('assets/wood-frame-png.png');scene.userData.frameTexture.colorSpace=THREE.SRGBColorSpace;
-  scene.userData.floorTexture=new THREE.TextureLoader().load('assets/oak-floor-25d.png');scene.userData.floorTexture.colorSpace=THREE.SRGBColorSpace;scene.userData.floorTexture.wrapS=scene.userData.floorTexture.wrapT=THREE.RepeatWrapping;scene.userData.floorTexture.repeat.set(8,7);scene.userData.floorTexture.anisotropy=coarsePointer?2:4;
+  const textureLoader=new THREE.TextureLoader();
+  scene.userData.cottonTexture=textureLoader.load('assets/cotton-surface-2d.png');scene.userData.cottonTexture.colorSpace=THREE.SRGBColorSpace;scene.userData.cottonTexture.wrapS=scene.userData.cottonTexture.wrapT=THREE.RepeatWrapping;scene.userData.cottonTexture.repeat.set(3,3);
+  scene.userData.frameTexture=textureLoader.load('assets/wood-frame-png.png');scene.userData.frameTexture.colorSpace=THREE.SRGBColorSpace;
+  scene.userData.floorTexture=textureLoader.load('assets/oak-floor-25d.png');scene.userData.floorTexture.colorSpace=THREE.SRGBColorSpace;scene.userData.floorTexture.wrapS=scene.userData.floorTexture.wrapT=THREE.RepeatWrapping;scene.userData.floorTexture.repeat.set(8,7);scene.userData.floorTexture.anisotropy=coarsePointer?2:4;
   scene.add(new THREE.HemisphereLight(0xfff5dc,0xa66f45,2.6));
   scene.add(new THREE.AmbientLight(0xfff0d5,1.05));
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(30.6,26.8),new THREE.MeshStandardMaterial({map:scene.userData.floorTexture,color:0xffffff,roughness:.88,metalness:0}));
@@ -50,7 +51,6 @@ function buildGallery(){
   ceiling.rotation.x=Math.PI/2;ceiling.position.y=5.7;scene.add(ceiling);
   const canopy=new THREE.Mesh(new THREE.PlaneGeometry(9.4,26.6),new THREE.MeshStandardMaterial({map:scene.userData.cottonTexture,color:0xfffbf3,transparent:true,opacity:.46,roughness:1,side:THREE.DoubleSide,depthWrite:false}));
   canopy.rotation.x=Math.PI/2;canopy.position.y=5.68;scene.add(canopy);
-  [-9.6,9.6].forEach(x=>{const frontWall=new THREE.Mesh(new THREE.BoxGeometry(11.2,5,.28),new THREE.MeshStandardMaterial({color:0xf1dfc3,roughness:.9}));frontWall.position.set(x,2.55,13.25);frontWall.receiveShadow=true;scene.add(frontWall)});
   buildEntrance();
   const sun=new THREE.DirectionalLight(0xffcb88,3.2);sun.position.set(-8,12,5);sun.target.position.set(2,0,-2);sun.castShadow=renderer.shadowMap.enabled;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-18;sun.shadow.camera.right=18;sun.shadow.camera.top=18;sun.shadow.camera.bottom=-18;scene.add(sun,sun.target);
   const sunPatch=new THREE.Mesh(new THREE.PlaneGeometry(8.5,10),new THREE.MeshBasicMaterial({color:0xffd699,transparent:true,opacity:.14,depthWrite:false}));sunPatch.rotation.x=-Math.PI/2;sunPatch.position.set(-3,.025,2);scene.add(sunPatch);
@@ -60,28 +60,13 @@ function buildGallery(){
   for(let i=0;i<10;i++)buildZone(i);
   buildCenterSculpture();buildCurator();buildWarmLights();buildCozyDetails();
 }
-
-function makeCottonTexture(){
-  const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');x.fillStyle='#fffaf0';x.fillRect(0,0,256,256);
-  x.globalAlpha=.14;x.strokeStyle='#bfae96';x.lineWidth=1;for(let i=0;i<256;i+=5){x.beginPath();x.moveTo(i,0);x.lineTo(i+8,256);x.stroke();x.beginPath();x.moveTo(0,i);x.lineTo(256,i+5);x.stroke()}
-  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(3,3);t.colorSpace=THREE.SRGBColorSpace;return t;
-}
-function makeWindowTexture(){
-  const c=document.createElement('canvas');c.width=512;c.height=320;const x=c.getContext('2d'),sky=x.createLinearGradient(0,0,0,320);sky.addColorStop(0,'#dceff0');sky.addColorStop(.58,'#fff7dc');sky.addColorStop(1,'#c9d8a7');x.fillStyle=sky;x.fillRect(0,0,512,320);
-  x.globalAlpha=.5;['#82985f','#a7b87b','#6f8855'].forEach((color,row)=>{x.fillStyle=color;for(let i=0;i<11;i++){x.beginPath();x.arc(28+i*51+(row%2)*18,250-row*24-(i%3)*9,34-(i%2)*7,0,Math.PI*2);x.fill()}});x.globalAlpha=.16;x.fillStyle='#fff';for(let i=0;i<6;i++)x.fillRect(28+i*92,0,14,320);
-  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;
-}
 function buildEntrance(){
-  const wood=new THREE.MeshStandardMaterial({color:0x8b5b36,roughness:.7}),darkWood=new THREE.MeshStandardMaterial({color:0x6e452b,roughness:.78}),glass=new THREE.MeshBasicMaterial({map:makeWindowTexture(),side:THREE.DoubleSide,toneMapped:true});
+  const loader=new THREE.TextureLoader(),facadeMap=loader.load('assets/entrance-facade-2d.png'),gardenMap=loader.load('assets/garden-view-2d.png'),doorMap=loader.load('assets/door-leaf-2d.png');[facadeMap,gardenMap,doorMap].forEach(t=>t.colorSpace=THREE.SRGBColorSpace);
   const deck=new THREE.Mesh(new THREE.PlaneGeometry(7.6,6.2),new THREE.MeshStandardMaterial({map:scene.userData.floorTexture,color:0xffffff,roughness:.88}));deck.rotation.x=-Math.PI/2;deck.position.set(0,-.005,15.75);deck.receiveShadow=true;scene.add(deck);
-  const gardenBackdrop=new THREE.Mesh(new THREE.PlaneGeometry(18,7.4),glass);gardenBackdrop.position.set(0,3.35,21);scene.add(gardenBackdrop);
-  [-9.6,9.6].forEach(x=>{
-    const windowGroup=new THREE.Group();windowGroup.position.set(x,0,13.08);const pane=new THREE.Mesh(new THREE.PlaneGeometry(5.2,2.75),glass);pane.position.y=3;windowGroup.add(pane);
-    [[0,1.53,5.55,.16],[0,4.47,5.55,.16],[-2.68,3,.16,3.12],[2.68,3,.16,3.12],[0,3,.11,3.02]].forEach(([px,py,w,h])=>{const rail=new THREE.Mesh(new THREE.BoxGeometry(w,h,.16),darkWood);rail.position.set(px,py,.09);windowGroup.add(rail)});scene.add(windowGroup);
-    const lightPatch=new THREE.Mesh(new THREE.PlaneGeometry(5.4,4.2),new THREE.MeshBasicMaterial({color:0xffe2aa,transparent:true,opacity:.13,depthWrite:false,side:THREE.DoubleSide}));lightPatch.rotation.x=-Math.PI/2;lightPatch.position.set(x,.03,9.7);scene.add(lightPatch);
-  });
-  const frame=new THREE.Group();[[0,4.55,4.75,.24],[-2.3,2.3,.25,4.7],[2.3,2.3,.25,4.7]].forEach(([x,y,w,h])=>{const part=new THREE.Mesh(new THREE.BoxGeometry(w,h,.3),darkWood);part.position.set(x,y,13.13);frame.add(part)});scene.add(frame);
-  const leaves=[];[-1,1].forEach(side=>{const pivot=new THREE.Group();pivot.position.set(side*2.05,0,13.04);const panelCenter=-side*.98,panel=new THREE.Mesh(new THREE.BoxGeometry(1.96,4.25,.18),wood);panel.position.set(panelCenter,2.18,0);panel.castShadow=renderer.shadowMap.enabled;pivot.add(panel);const pane=new THREE.Mesh(new THREE.PlaneGeometry(1.38,2.35),glass);pane.position.set(panelCenter,2.9,.1);pivot.add(pane);const handle=new THREE.Mesh(new THREE.SphereGeometry(.08,12,10),new THREE.MeshStandardMaterial({color:0xb7864a,metalness:.45,roughness:.38}));handle.position.set(-side*1.68,2.15,.14);pivot.add(handle);scene.add(pivot);leaves.push(pivot)});scene.userData.doors=leaves;
+  const gardenBackdrop=new THREE.Mesh(new THREE.PlaneGeometry(22,9.6),new THREE.MeshBasicMaterial({map:gardenMap,side:THREE.DoubleSide}));gardenBackdrop.position.set(0,4.3,21);scene.add(gardenBackdrop);
+  const facade=new THREE.Mesh(new THREE.PlaneGeometry(30.4,5.7),new THREE.MeshBasicMaterial({map:facadeMap,transparent:true,alphaTest:.025,side:THREE.DoubleSide}));facade.position.set(0,2.85,13.2);facade.renderOrder=2;scene.add(facade);scene.userData.entranceFacade=facade;
+  [-9.6,9.6].forEach(x=>{const lightPatch=new THREE.Mesh(new THREE.PlaneGeometry(5.4,4.2),new THREE.MeshBasicMaterial({color:0xffe2aa,transparent:true,opacity:.13,depthWrite:false,side:THREE.DoubleSide}));lightPatch.rotation.x=-Math.PI/2;lightPatch.position.set(x,.03,9.7);scene.add(lightPatch)});
+  const leaves=[];[-1,1].forEach(side=>{const map=doorMap.clone();map.needsUpdate=true;if(side<0){map.wrapS=THREE.RepeatWrapping;map.repeat.x=-1;map.offset.x=1}const pivot=new THREE.Group();pivot.position.set(side*2.52,0,13.12);const panel=new THREE.Mesh(new THREE.PlaneGeometry(2.52,4.72),new THREE.MeshBasicMaterial({map,transparent:true,alphaTest:.035,side:THREE.DoubleSide}));panel.position.set(-side*1.26,2.36,0);panel.renderOrder=3;pivot.add(panel);scene.add(pivot);leaves.push(pivot)});scene.userData.doors=leaves;
 }
 function buildZone(ci){
   const layout=ZONE_LAYOUT[ci],c=children[ci],zone=new THREE.Group();zone.position.set(layout.x,0,layout.z);zone.rotation.y=layout.ry;scene.add(zone);
