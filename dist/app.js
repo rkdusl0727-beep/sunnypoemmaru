@@ -5,12 +5,12 @@ const children=Array.from({length:10},(_,i)=>({id:i+1,name:`어린이 ${String(i
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const adminMode=document.body.dataset.admin==='true';
 const canvas=$('#gallery-canvas');
-let scene,camera,renderer,clock,raycaster,frameMeshes=[],yaw=0,pitch=0,started=false,modalOpen=false,overviewMode=false;
+let scene,camera,renderer,clock,raycaster,frameMeshes=[],navigationMeshes=[],yaw=0,pitch=0,started=false,modalOpen=false,overviewMode=false;
 let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,dragMode=null,dragStartX=0,dragStartY=0,lastX=0,lastY=0,keys={},joy={x:0,y:0};
 let tourActive=false,tourElapsed=0,entryActive=false,entryElapsed=0,hasDestination=false,zoneTravelActive=false,zoneTravelElapsed=0;
 let destinationTurnsView=true;
 let audioContext,audioMaster,musicTimer,musicStep=0,musicOn=true;
-let guideUtterance=null,guideAudioBufferPromise=null,guideAudioSource=null,guideAudioPending=false,contactShadowTexture=null;
+let guideUtterance=null,guideAudioBufferPromise=null,guideAudioSource=null,guideAudioPending=false,guidePlayed=false,contactShadowTexture=null;
 const coarsePointer=matchMedia('(pointer:coarse)').matches||innerWidth<800,reduceMotion=matchMedia('(prefers-reduced-motion:reduce)').matches,moveVelocity=new THREE.Vector3(),moveTarget=new THREE.Vector3(),moveDestination=new THREE.Vector3(),curatorTarget=new THREE.Vector3(),clickPoint=new THREE.Vector2();
 const cameraPos=new THREE.Vector3(0,1.65,11.2);
 const zoneTravelStart=new THREE.Vector3(),zoneTravelEnd=new THREE.Vector3();
@@ -91,6 +91,7 @@ function buildZone(ci){
   const layout=ZONE_LAYOUT[ci],c=children[ci],zone=new THREE.Group();zone.position.set(layout.x,0,layout.z);zone.rotation.y=layout.ry;scene.add(zone);
   const panel=new THREE.Mesh(new THREE.BoxGeometry(7.18,5,.28),new THREE.MeshStandardMaterial({color:0xf1dfc3,roughness:.9}));panel.position.y=2.55;panel.receiveShadow=true;zone.add(panel);
   const wood=new THREE.Mesh(new THREE.BoxGeometry(7.2,1.02,.32),new THREE.MeshStandardMaterial({color:0x9b6840,roughness:.85}));wood.position.y=.53;zone.add(wood);
+  const navigationTarget=zoneLocalToWorld(layout,0,3.65);panel.userData={type:'navigation',target:navigationTarget};wood.userData={type:'navigation',target:navigationTarget};navigationMeshes.push(panel,wood);
   scene.userData.theme.panels.push(panel.material);scene.userData.theme.bases.push(wood.material);
   const header=new THREE.Mesh(new THREE.PlaneGeometry(3.8,.95),new THREE.MeshBasicMaterial({map:makeTextTexture(c.name,'어린이 작가의 방',c.color,1024,256),transparent:true}));
   header.position.set(0,4.35,.17);zone.add(header);
@@ -145,7 +146,7 @@ function buildPlant(x,z){
 }
 function buildCurator(){
   const loader=new THREE.TextureLoader(),textures={idle:loader.load('assets/curator-maru.png'),frontA:loader.load('assets/curator-walk-a.png'),frontB:loader.load('assets/curator-walk-b.png'),sideA:loader.load('assets/curator-side-a.png'),sideB:loader.load('assets/curator-side-b.png'),backA:loader.load('assets/curator-back-a.png'),backB:loader.load('assets/curator-back-b.png')};Object.values(textures).forEach(t=>t.colorSpace=THREE.SRGBColorSpace);
-  const g=new THREE.Sprite(new THREE.SpriteMaterial({map:textures.idle,transparent:true,alphaTest:.04,depthWrite:false}));g.scale.set(1.28,1.92,1);g.position.set(1.35,.96,6.7);g.visible=false;g.renderOrder=4;g.userData={type:'curator',textures,currentTexture:textures.idle,facing:'front'};scene.add(g);scene.userData.curator=g;frameMeshes.push(g);
+  const g=new THREE.Sprite(new THREE.SpriteMaterial({map:textures.idle,transparent:true,alphaTest:.04,depthWrite:false}));g.scale.set(1.28,1.92,1);g.position.set(1.35,.96,6.7);g.visible=false;g.renderOrder=4;g.userData={type:'curator',textures,currentTexture:textures.idle,facing:'front'};scene.add(g);scene.userData.curator=g;
   const shadow=makeContactShadow(g.position.x,g.position.z,.86,.34,.24);shadow.visible=false;scene.userData.curatorShadow=shadow;
 }
 function buildWarmLights(){
@@ -236,10 +237,10 @@ function updateZone(){
 }
 function updateFocus(){
   raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
-  const hits=raycaster.intersectObjects(frameMeshes,false),hit=hits[0]&&hits[0].distance<(hits[0].object.userData.type==='curator'?9:7)?hits[0]:null;
+  const hits=raycaster.intersectObjects(frameMeshes,false),hit=hits[0]&&hits[0].distance<7?hits[0]:null;
   $('#crosshair').classList.toggle('active',!!hit);camera.userData.focus=hit?.object||null;
 }
-function activateCenter(){if(camera.userData.focus){const d=camera.userData.focus.userData;if(d.type==='curator')speakCurator();else openPoem(d.child,d.poem)}}
+function activateCenter(){if(camera.userData.focus){const d=camera.userData.focus.userData;openPoem(d.child,d.poem)}}
 function setMoveDestination(target,turnsView=true,showMarker=true){
   moveDestination.copy(target);moveDestination.y=0;constrainWalkPosition(moveDestination);destinationTurnsView=turnsView;hasDestination=true;moveVelocity.multiplyScalar(.35);const marker=scene.userData.clickMarker;marker.position.set(moveDestination.x,.018,moveDestination.z);marker.visible=showMarker
 }
@@ -248,10 +249,13 @@ function queueDirectionalMove(distance){
 }
 function handleWorldClick(x,y){
   clickPoint.set(x/innerWidth*2-1,-(y/innerHeight)*2+1);raycaster.setFromCamera(clickPoint,camera);
-  const subject=raycaster.intersectObjects(frameMeshes,false)[0];if(subject){const d=subject.object.userData;if(d.type==='curator')speakCurator();else openPoem(d.child,d.poem);return}
-  if(y>innerHeight*.72){queueDirectionalMove(-4.2);return}
-  const floorHit=raycaster.intersectObject(scene.userData.floor,false)[0];
-  if(floorHit)setMoveDestination(floorHit.point,true,true);else{const direction=raycaster.ray.direction.clone();direction.y=0;if(direction.lengthSq()<.01)return;direction.normalize();setMoveDestination(camera.position.clone().addScaledVector(direction,6),true,true)}
+  const subject=raycaster.intersectObjects(frameMeshes,false)[0],curatorHit=scene.userData.curator?.visible?raycaster.intersectObject(scene.userData.curator,false)[0]:null,navigationHit=raycaster.intersectObjects(navigationMeshes,false)[0],floorHit=raycaster.intersectObject(scene.userData.floor,false)[0];
+  const nearestDistance=Math.min(subject?.distance??Infinity,curatorHit?.distance??Infinity,navigationHit?.distance??Infinity,floorHit?.distance??Infinity);
+  if(curatorHit&&curatorHit.distance===nearestDistance)return;
+  if(subject&&subject.distance===nearestDistance){const d=subject.object.userData;openPoem(d.child,d.poem);return}
+  if(navigationHit&&navigationHit.distance===nearestDistance){setMoveDestination(navigationHit.object.userData.target,true,true);return}
+  if(floorHit){setMoveDestination(floorHit.point,true,true);return}
+  const direction=raycaster.ray.direction.clone();direction.y=0;if(direction.lengthSq()<.01)return;direction.normalize();setMoveDestination(camera.position.clone().addScaledVector(direction,6),true,true)
 }
 function constrainWalkPosition(position){
   let adjusted=false,x=THREE.MathUtils.clamp(position.x,WALK_BOUNDS.minX,WALK_BOUNDS.maxX),z=THREE.MathUtils.clamp(position.z,WALK_BOUNDS.minZ,WALK_BOUNDS.maxZ);if(x!==position.x||z!==position.z)adjusted=true;position.x=x;position.z=z;
@@ -304,7 +308,7 @@ function getNaturalKoreanVoice(){
   return korean.find(v=>/yuna|natural|premium|enhanced|sunhi|sora|heami|google|microsoft/i.test(v.name))||korean[0]||null
 }
 function speakCurator(attempt=0){
-  if(guideAudioSource||guideUtterance||guideAudioPending)return;if(audioContext){guideAudioPending=true;prepareGuideAudio().then(buffer=>{guideAudioPending=false;if(!started||entryActive||tourActive)return;moveVelocity.set(0,0,0);hasDestination=false;scene.userData.clickMarker.visible=false;guideAudioSource=audioContext.createBufferSource();const gain=audioContext.createGain();guideAudioSource.buffer=buffer;gain.gain.value=.9;guideAudioSource.connect(gain).connect(audioContext.destination);if(audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.012,audioContext.currentTime+.35);guideAudioSource.onended=()=>{guideAudioSource=null;if(audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.055,audioContext.currentTime+.8)};audioContext.resume();guideAudioSource.start()}).catch(()=>{guideAudioPending=false;speakBrowserVoice(attempt)});return}speakBrowserVoice(attempt)
+  if(guidePlayed||guideAudioSource||guideUtterance||guideAudioPending)return;guidePlayed=true;if(audioContext){guideAudioPending=true;prepareGuideAudio().then(buffer=>{guideAudioPending=false;if(!started||entryActive||tourActive)return;moveVelocity.set(0,0,0);hasDestination=false;scene.userData.clickMarker.visible=false;guideAudioSource=audioContext.createBufferSource();const gain=audioContext.createGain();guideAudioSource.buffer=buffer;gain.gain.value=.9;guideAudioSource.connect(gain).connect(audioContext.destination);if(audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.012,audioContext.currentTime+.35);guideAudioSource.onended=()=>{guideAudioSource=null;if(audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.055,audioContext.currentTime+.8)};audioContext.resume();guideAudioSource.start()}).catch(()=>{guideAudioPending=false;speakBrowserVoice(attempt)});return}speakBrowserVoice(attempt)
 }
 function prepareGuideAudio(){
   if(!guideAudioBufferPromise&&audioContext)guideAudioBufferPromise=fetch('assets/curator-guide.mp3').then(response=>{if(!response.ok)throw new Error('guide audio unavailable');return response.arrayBuffer()}).then(data=>audioContext.decodeAudioData(data));return guideAudioBufferPromise
