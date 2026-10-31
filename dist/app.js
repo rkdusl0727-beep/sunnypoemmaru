@@ -6,13 +6,16 @@ const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const canvas=$('#gallery-canvas');
 let scene,camera,renderer,clock,raycaster,frameMeshes=[],yaw=0,pitch=0,started=false,modalOpen=false,overviewMode=false;
 let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,lastX=0,lastY=0,keys={},joy={x:0,y:0};
-let tourActive=false,tourElapsed=0,entryActive=false,entryElapsed=0,hasDestination=false;
+let tourActive=false,tourElapsed=0,entryActive=false,entryElapsed=0,hasDestination=false,zoneTravelActive=false,zoneTravelElapsed=0;
 let audioContext,audioMaster,musicTimer,musicStep=0,musicOn=true;
 let guideUtterance=null,contactShadowTexture=null;
 const coarsePointer=matchMedia('(pointer:coarse)').matches||innerWidth<800,reduceMotion=matchMedia('(prefers-reduced-motion:reduce)').matches,moveVelocity=new THREE.Vector3(),moveTarget=new THREE.Vector3(),moveDestination=new THREE.Vector3(),curatorTarget=new THREE.Vector3(),clickPoint=new THREE.Vector2();
 const cameraPos=new THREE.Vector3(0,1.65,11.2);
+const zoneTravelStart=new THREE.Vector3(),zoneTravelEnd=new THREE.Vector3();
 const TOUR_DURATION=10;
 const ENTRY_DURATION=3.6;
+const ZONE_TRAVEL_DURATION=1.55;
+let zoneTravelStartAngle=0,zoneTravelAngleDelta=0,zoneTravelStartRadius=0,zoneTravelEndRadius=0,zoneTravelStartYaw=0,zoneTravelEndYaw=0,zoneTravelChild=0;
 const WALK_BOUNDS={minX:-11.55,maxX:11.55,minZ:-9.7,maxZ:10};
 const SAFE_ZONES=[{x:0,z:0,r:3.35}];
 const ZONE_LAYOUT=[
@@ -142,12 +145,12 @@ function bind(){
   addEventListener('resize',resize);
   addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key==='Escape'){closePoem();closeIndex();stopGuideVoice()}});
   addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
-  canvas.addEventListener('pointerdown',e=>{if(!started||modalOpen||tourActive||entryActive)return;dragging=true;dragMoved=false;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId)});
+  canvas.addEventListener('pointerdown',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;dragging=true;dragMoved=false;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId)});
   canvas.addEventListener('pointermove',e=>{if(!started||modalOpen||tourActive||entryActive||!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;if(Math.abs(dx)+Math.abs(dy)>3)dragMoved=true;yaw-=dx*.0042;pitch=Math.max(-.78,Math.min(.72,pitch-dy*.0034));lastX=e.clientX;lastY=e.clientY});
   canvas.addEventListener('pointerleave',()=>{dragging=false});
   canvas.addEventListener('pointerup',e=>{if(dragging&&!dragMoved)handleWorldClick(e.clientX,e.clientY);dragging=false});
   $('#enter').onclick=()=>{started=true;$('#intro').classList.add('closed');$('#hud').hidden=false;startAmbientMusic();startEntrySequence()};
-  $('#home').onclick=()=>{$('#intro').classList.remove('closed');$('#hud').hidden=true;$('#hud').classList.remove('cinematic');started=false;tourActive=false;entryActive=false;hasDestination=false;resetEntrance();stopAmbientMusic();stopGuideVoice()};
+  $('#home').onclick=()=>{$('#intro').classList.remove('closed');$('#hud').hidden=true;$('#hud').classList.remove('cinematic');started=false;tourActive=false;entryActive=false;zoneTravelActive=false;hasDestination=false;resetEntrance();stopAmbientMusic();stopGuideVoice()};
   $('#music-toggle').onclick=()=>musicOn?stopAmbientMusic():startAmbientMusic();
   $('#overview').onclick=showOverview;$('#index-open').onclick=openIndex;$('#index-close').onclick=closeIndex;
   $$('[data-close]').forEach(b=>b.onclick=closePoem);
@@ -161,7 +164,7 @@ function bindJoystick(){
 function animate(){
   requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);
   if(started&&!modalOpen){
-    if(entryActive){updateEntrySequence(dt);updateMap()}else if(tourActive){updatePanoramaTour(dt);updateZone();updateMap()}else{
+    if(entryActive){updateEntrySequence(dt);updateMap()}else if(tourActive){updatePanoramaTour(dt);updateZone();updateMap()}else if(zoneTravelActive){updateZoneTravel(dt);updateMap()}else{
       const forward=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0)-joy.y;
       const side=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0)+joy.x;
       if(forward||side){hasDestination=false;scene.userData.clickMarker.visible=false;moveTarget.set(-Math.sin(yaw)*forward+Math.cos(yaw)*side,0,-Math.cos(yaw)*forward-Math.sin(yaw)*side);if(moveTarget.lengthSq()>1)moveTarget.normalize();moveTarget.multiplyScalar(7.4)}
@@ -224,7 +227,7 @@ function constrainWalkPosition(position){
 }
 function resetEntrance(){(scene.userData.doors||[]).forEach(door=>door.rotation.y=0);camera.position.set(0,1.65,11.2);yaw=0;pitch=0;camera.rotation.set(0,0,0)}
 function startEntrySequence(){
-  hasDestination=false;tourActive=false;entryActive=true;entryElapsed=0;moveVelocity.set(0,0,0);$('#hud').classList.add('cinematic');(scene.userData.doors||[]).forEach(door=>door.rotation.y=0);camera.position.set(0,1.68,16.5);yaw=0;pitch=0;camera.fov=68;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='전시장 입구'
+  hasDestination=false;tourActive=false;zoneTravelActive=false;entryActive=true;entryElapsed=0;moveVelocity.set(0,0,0);$('#hud').classList.add('cinematic');(scene.userData.doors||[]).forEach(door=>door.rotation.y=0);camera.position.set(0,1.68,16.5);yaw=0;pitch=0;camera.fov=68;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='전시장 입구'
 }
 function updateEntrySequence(dt){
   entryElapsed=Math.min(ENTRY_DURATION,entryElapsed+dt);const t=entryElapsed/ENTRY_DURATION,doorT=THREE.MathUtils.smoothstep(Math.min(1,t/.42),0,1),walkT=THREE.MathUtils.smoothstep(Math.max(0,(t-.24)/.76),0,1),doors=scene.userData.doors||[];if(doors[0])doors[0].rotation.y=doorT*1.08;if(doors[1])doors[1].rotation.y=-doorT*1.08;camera.position.z=THREE.MathUtils.lerp(16.5,11.2,walkT);camera.position.y=1.68+Math.sin(walkT*Math.PI)*.035;camera.rotation.set(0,0,0);if(t>=1){entryActive=false;$('#hud').classList.remove('cinematic');camera.fov=72;camera.updateProjectionMatrix();startPanoramaTour()}
@@ -237,7 +240,15 @@ function updatePanoramaTour(dt){
 }
 function finishPanoramaTour(){tourActive=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,9.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구'}
 function dampAngle(a,b,t){let d=(b-a+Math.PI)%(Math.PI*2)-Math.PI;if(d<-Math.PI)d+=Math.PI*2;return a+d*t}
-function showOverview(){tourActive=false;entryActive=false;hasDestination=false;scene.userData.clickMarker.visible=false;overviewMode=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,9.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구'}
+function showOverview(){tourActive=false;entryActive=false;zoneTravelActive=false;hasDestination=false;scene.userData.clickMarker.visible=false;overviewMode=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,9.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구'}
+function goToChildZone(ci){
+  const layout=ZONE_LAYOUT[ci];closeIndex();closePoem();if(!started){started=true;$('#intro').classList.add('closed');$('#hud').hidden=false;startAmbientMusic();resetEntrance()}
+  entryActive=false;tourActive=false;hasDestination=false;scene.userData.clickMarker.visible=false;moveVelocity.set(0,0,0);zoneTravelChild=ci;zoneTravelElapsed=0;zoneTravelActive=true;zoneTravelStart.copy(camera.position);zoneTravelEnd.copy(zoneLocalToWorld(layout,0,4.45));zoneTravelEnd.y=1.65;
+  zoneTravelStartRadius=Math.max(3.6,Math.hypot(zoneTravelStart.x,zoneTravelStart.z));zoneTravelEndRadius=Math.hypot(zoneTravelEnd.x,zoneTravelEnd.z);zoneTravelStartAngle=Math.atan2(zoneTravelStart.z,zoneTravelStart.x);const endAngle=Math.atan2(zoneTravelEnd.z,zoneTravelEnd.x);zoneTravelAngleDelta=(endAngle-zoneTravelStartAngle+Math.PI*3)%(Math.PI*2)-Math.PI;zoneTravelStartYaw=yaw;zoneTravelEndYaw=Math.atan2(-(layout.x-zoneTravelEnd.x),-(layout.z-zoneTravelEnd.z));pitch=0;$('#zone-name').textContent=`${children[ci].name}의 방으로 이동 중`
+}
+function updateZoneTravel(dt){
+  zoneTravelElapsed=Math.min(ZONE_TRAVEL_DURATION,zoneTravelElapsed+dt);const t=zoneTravelElapsed/ZONE_TRAVEL_DURATION,e=t*t*(3-2*t),angle=zoneTravelStartAngle+zoneTravelAngleDelta*e,radius=THREE.MathUtils.lerp(zoneTravelStartRadius,zoneTravelEndRadius,e);camera.position.set(Math.cos(angle)*radius,1.65,Math.sin(angle)*radius);yaw=dampAngle(zoneTravelStartYaw,zoneTravelEndYaw,e);camera.rotation.set(0,yaw,0);if(t>=1){zoneTravelActive=false;camera.position.copy(zoneTravelEnd);camera.rotation.set(0,zoneTravelEndYaw,0);yaw=zoneTravelEndYaw;$('#zone-name').textContent=`${children[zoneTravelChild].name}의 방`}
+}
 function updateMap(){const x=camera.position.x/15*40,z=camera.position.z/13.2*40;$('#map-dot').style.transform=`translate(${x}px,${z}px)`;$('#map-view').style.transform=`rotate(${-yaw}rad)`}
 function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,coarsePointer?1:1.25))}
 
@@ -268,8 +279,8 @@ function buildIndex(){
   const root=$('#index-list');
   children.forEach((c,ci)=>{
     const el=document.createElement('div');el.className='index-child';
-    el.innerHTML=`<button type="button"><i style="--c:${c.color}"></i><strong>${c.name}</strong><span>동시 5편</span></button><div class="index-poems">${c.poems.map((p,pi)=>`<button type="button" data-ci="${ci}" data-pi="${pi}">${pi+1}. ${p.title}</button>`).join('')}</div>`;
-    el.firstElementChild.onclick=()=>el.classList.toggle('open');root.append(el);
+    el.innerHTML=`<div class="index-child-row"><button class="index-child-go" type="button" aria-label="${c.name} 전시공간으로 이동"><i style="--c:${c.color}"></i><strong>${c.name}</strong></button><button class="index-child-toggle" type="button" aria-label="${c.name}의 동시 5편 펼치기" aria-expanded="false">동시 5편</button></div><div class="index-poems">${c.poems.map((p,pi)=>`<button type="button" data-ci="${ci}" data-pi="${pi}">${pi+1}. ${p.title}</button>`).join('')}</div>`;
+    const go=el.querySelector('.index-child-go'),toggle=el.querySelector('.index-child-toggle');go.onclick=()=>goToChildZone(ci);toggle.onclick=()=>{const open=el.classList.toggle('open');toggle.setAttribute('aria-expanded',String(open));toggle.setAttribute('aria-label',`${c.name}의 동시 5편 ${open?'접기':'펼치기'}`)};root.append(el);
   });
   $$('[data-ci]').forEach(b=>b.onclick=()=>{closeIndex();openPoem(+b.dataset.ci,+b.dataset.pi)});
 }
