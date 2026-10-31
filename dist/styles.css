@@ -53,3 +53,9 @@ body[data-gallery-theme="storybook"] .intro{background:radial-gradient(circle at
 /* 엄마까투리체: 어린이 전시의 제목과 짧은 강조 문구에만 적용 */
 .intro h1,.intro>button,.logo,.zone-label strong,.poem-card h2,.poem-meta strong,.index-panel h2,.index-child-go strong,.curator-card h2,.settings-panel h2,.gallery-config h3,.scan-child h3,.poem-scan-empty strong{font-family:var(--display-font);font-weight:400}
 .intro h1{line-height:1.08;letter-spacing:.015em}.intro h1 em{margin-bottom:.12em}.logo,.zone-label strong{letter-spacing:.015em}
+
+/* 메인 화면: 가장자리 비네팅 없이 고른 파스텔 햇살과 더 큰 큐레이터 */
+.intro,body[data-gallery-theme="storybook"] .intro{background:linear-gradient(180deg,#fffef7 0%,#fffbe9 52%,#fff4cf 100%);backdrop-filter:none}
+.intro::before{display:none}
+.intro-curator{width:min(27vw,400px);right:2vw;bottom:-1vh}
+@media(max-width:700px){.intro-curator{width:min(60vw,320px);right:-3vw;bottom:-.5vh}}
