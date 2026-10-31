@@ -5,10 +5,12 @@ const children=Array.from({length:10},(_,i)=>({id:i+1,name:`어린이 ${String(i
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const canvas=$('#gallery-canvas');
 let scene,camera,renderer,clock,raycaster,frameMeshes=[],yaw=0,pitch=0,started=false,modalOpen=false,overviewMode=false;
-let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,lastX=0,lastY=0,keys={},joy={x:0,y:0},mouseDrive={x:0,y:0,active:false};
+let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,lastX=0,lastY=0,keys={},joy={x:0,y:0};
+let tourActive=false,tourElapsed=0,hasDestination=false;
 let audioContext,audioMaster,musicTimer,musicStep=0,musicOn=true;
-const coarsePointer=matchMedia('(pointer:coarse)').matches||innerWidth<800,moveVelocity=new THREE.Vector3(),moveTarget=new THREE.Vector3(),curatorTarget=new THREE.Vector3();
+const coarsePointer=matchMedia('(pointer:coarse)').matches||innerWidth<800,reduceMotion=matchMedia('(prefers-reduced-motion:reduce)').matches,moveVelocity=new THREE.Vector3(),moveTarget=new THREE.Vector3(),moveDestination=new THREE.Vector3(),curatorTarget=new THREE.Vector3(),clickPoint=new THREE.Vector2();
 const cameraPos=new THREE.Vector3(0,1.65,5.3);
+const TOUR_DURATION=10;
 const visited=new Set(JSON.parse(localStorage.getItem('galleryVisited')||'[]'));
 
 function init(){
@@ -34,7 +36,8 @@ function buildGallery(){
   scene.add(new THREE.HemisphereLight(0xfff5dc,0xa66f45,2.6));
   scene.add(new THREE.AmbientLight(0xfff0d5,1.05));
   const floor=new THREE.Mesh(new THREE.CircleGeometry(15.2,96),new THREE.MeshStandardMaterial({map:scene.userData.floorTexture,color:0xffffff,roughness:.88,metalness:0}));
-  floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+  floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;floor.userData.type='floor';scene.add(floor);scene.userData.floor=floor;
+  const marker=new THREE.Mesh(new THREE.RingGeometry(.2,.32,32),new THREE.MeshBasicMaterial({color:0xb87538,transparent:true,opacity:.88,side:THREE.DoubleSide,depthWrite:false}));marker.rotation.x=-Math.PI/2;marker.position.y=.045;marker.visible=false;scene.add(marker);scene.userData.clickMarker=marker;
   for(let r=2;r<15;r+=2){
     const ring=new THREE.Mesh(new THREE.RingGeometry(r-.025,r+.025,96),new THREE.MeshBasicMaterial({color:0x714626,transparent:true,opacity:.3,side:THREE.DoubleSide}));
     ring.rotation.x=-Math.PI/2;ring.position.y=.012;scene.add(ring);
@@ -52,6 +55,7 @@ function buildGallery(){
   const sunPatch=new THREE.Mesh(new THREE.CircleGeometry(5.4,48),new THREE.MeshBasicMaterial({color:0xffd699,transparent:true,opacity:.18,depthWrite:false}));sunPatch.rotation.x=-Math.PI/2;sunPatch.position.set(-3,.025,2);scene.add(sunPatch);
   const sunSpot=new THREE.SpotLight(0xffd29a,9,26,Math.PI/5,.92,1);sunSpot.position.set(-7,11,6);sunSpot.target.position.set(1,0,-1);sunSpot.castShadow=false;scene.add(sunSpot,sunSpot.target);
   for(let i=0;i<4;i++){const stripe=new THREE.Mesh(new THREE.PlaneGeometry(.72,10),new THREE.MeshBasicMaterial({color:0xffdfad,transparent:true,opacity:.1,depthWrite:false,side:THREE.DoubleSide}));stripe.rotation.x=-Math.PI/2;stripe.rotation.z=-.58;stripe.position.set(-5+i*1.25,.035,1+i*.35);scene.add(stripe)}
+  scene.userData.frameSideMaterial=new THREE.MeshStandardMaterial({color:0x8d5b34,roughness:.72,metalness:0});
   for(let i=0;i<10;i++)buildZone(i);
   buildCenterSculpture();buildCurator();buildWarmLights();buildCozyDetails();
 }
@@ -69,10 +73,10 @@ function buildZone(ci){
   placeOnRing(accent,base,14.72,3.84);scene.add(accent);
   c.poems.forEach((p,pi)=>{
     const angle=base+THREE.MathUtils.degToRad((pi-2)*5.7);
-    const frame=new THREE.Mesh(new THREE.PlaneGeometry(1.62,2.06),new THREE.MeshBasicMaterial({map:scene.userData.frameTexture,transparent:true,alphaTest:.035,depthWrite:false,toneMapped:true}));
-    placeOnRing(frame,angle,14.74,2.55);frame.renderOrder=2;scene.add(frame);
-    const art=new THREE.Mesh(new THREE.PlaneGeometry(1.34,1.78),new THREE.MeshStandardMaterial({map:makePoemTexture(ci,pi),roughness:.48,emissive:new THREE.Color(c.color),emissiveIntensity:.045}));
-    placeOnRing(art,angle,14.65,2.55);art.userData={type:'poem',child:ci,poem:pi};frameMeshes.push(art);scene.add(art);
+    const framedArt=new THREE.Group();placeOnRing(framedArt,angle,14.72,2.55);
+    const frameBody=new THREE.Mesh(new THREE.BoxGeometry(1.58,2.02,.16),scene.userData.frameSideMaterial);frameBody.castShadow=renderer.shadowMap.enabled;framedArt.add(frameBody);
+    const art=new THREE.Mesh(new THREE.PlaneGeometry(1.34,1.78),new THREE.MeshStandardMaterial({map:makePoemTexture(ci,pi),roughness:.48,emissive:new THREE.Color(c.color),emissiveIntensity:.045,side:THREE.DoubleSide}));art.position.z=.086;art.userData={type:'poem',child:ci,poem:pi};frameMeshes.push(art);framedArt.add(art);
+    const frame=new THREE.Mesh(new THREE.PlaneGeometry(1.62,2.06),new THREE.MeshBasicMaterial({map:scene.userData.frameTexture,transparent:true,alphaTest:.035,depthWrite:false,toneMapped:true,side:THREE.DoubleSide}));frame.position.z=.098;frame.renderOrder=2;framedArt.add(frame);scene.add(framedArt);
   });
   const zoneGlow=new THREE.PointLight(c.color,.38,6,2);zoneGlow.position.set(Math.sin(base)*11.8,3.6,Math.cos(base)*11.8);scene.add(zoneGlow);
   buildPlant(base+THREE.MathUtils.degToRad(16),12.9);
@@ -127,15 +131,15 @@ function bind(){
   addEventListener('resize',resize);
   addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key==='Escape'){closePoem();closeIndex();closeCurator()}});
   addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
-  canvas.addEventListener('pointerdown',e=>{if(!started||modalOpen)return;dragging=true;dragMoved=false;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId)});
-  canvas.addEventListener('pointermove',e=>{if(!started||modalOpen)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;if(dragging&&Math.abs(dx)+Math.abs(dy)>3)dragMoved=true;if(coarsePointer){if(!dragging)return;yaw-=dx*.0042;pitch=Math.max(-.78,Math.min(.72,pitch-dy*.0034));lastX=e.clientX;lastY=e.clientY;return}mouseDrive.x=Math.max(-1,Math.min(1,e.clientX/innerWidth*2-1));mouseDrive.y=Math.max(-1,Math.min(1,e.clientY/innerHeight*2-1));mouseDrive.active=true;lastX=e.clientX;lastY=e.clientY});
-  canvas.addEventListener('pointerleave',()=>{if(!coarsePointer)mouseDrive.active=false});
-  canvas.addEventListener('pointerup',()=>{if(dragging&&!dragMoved)activateCenter();dragging=false});
-  $('#enter').onclick=()=>{started=true;$('#intro').classList.add('closed');$('#hud').hidden=false;showOverview();startAmbientMusic();showToast(coarsePointer?'방향 버튼으로 이동하고 화면을 밀어 둘러보세요':'마우스를 위·아래·좌우로 옮겨 이동하세요. 가운데 두면 멈춰요')};
-  $('#home').onclick=()=>{$('#intro').classList.remove('closed');$('#hud').hidden=true;started=false;mouseDrive.active=false;stopAmbientMusic()};
+  canvas.addEventListener('pointerdown',e=>{if(!started||modalOpen||tourActive)return;dragging=true;dragMoved=false;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId)});
+  canvas.addEventListener('pointermove',e=>{if(!started||modalOpen||tourActive||!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;if(Math.abs(dx)+Math.abs(dy)>3)dragMoved=true;yaw-=dx*.0042;pitch=Math.max(-.78,Math.min(.72,pitch-dy*.0034));lastX=e.clientX;lastY=e.clientY});
+  canvas.addEventListener('pointerleave',()=>{dragging=false});
+  canvas.addEventListener('pointerup',e=>{if(dragging&&!dragMoved)handleWorldClick(e.clientX,e.clientY);dragging=false});
+  $('#enter').onclick=()=>{started=true;$('#intro').classList.add('closed');$('#hud').hidden=false;startAmbientMusic();startPanoramaTour()};
+  $('#home').onclick=()=>{$('#intro').classList.remove('closed');$('#hud').hidden=true;started=false;tourActive=false;hasDestination=false;$('#tour-guide').hidden=true;stopAmbientMusic()};
   $('#music-toggle').onclick=()=>musicOn?stopAmbientMusic():startAmbientMusic();
   $('#overview').onclick=showOverview;$('#index-open').onclick=openIndex;$('#index-close').onclick=closeIndex;
-  $('#curator-close').onclick=closeCurator;$('#curator-overview').onclick=()=>{closeCurator();showOverview()};
+  $('#curator-close').onclick=closeCurator;$('#curator-overview').onclick=()=>{closeCurator();showOverview()};$('#tour-skip').onclick=finishPanoramaTour;
   $$('[data-close]').forEach(b=>b.onclick=closePoem);
   $('#prev-poem').onclick=()=>movePoem(-1);$('#next-poem').onclick=()=>movePoem(1);bindJoystick();
 }
@@ -147,18 +151,18 @@ function bindJoystick(){
 function animate(){
   requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);
   if(started&&!modalOpen){
-    const dead=.18,mx=mouseDrive.active&&!coarsePointer&&Math.abs(mouseDrive.x)>dead?Math.sign(mouseDrive.x)*(Math.abs(mouseDrive.x)-dead)/(1-dead):0,my=mouseDrive.active&&!coarsePointer&&Math.abs(mouseDrive.y)>dead?-Math.sign(mouseDrive.y)*(Math.abs(mouseDrive.y)-dead)/(1-dead):0;
-    yaw-=mx*1.55*dt;
-    const forward=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0)-joy.y+my;
-    const side=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0)+joy.x;
-    moveTarget.set(-Math.sin(yaw)*forward+Math.cos(yaw)*side,0,-Math.cos(yaw)*forward-Math.sin(yaw)*side);
-    if(moveTarget.lengthSq()>1)moveTarget.normalize();moveTarget.multiplyScalar(7.4);
-    moveVelocity.lerp(moveTarget,1-Math.exp(-(moveTarget.lengthSq()>.01?11:8)*dt));camera.position.addScaledVector(moveVelocity,dt);
-    const r=Math.hypot(camera.position.x,camera.position.z);
-    if(r>12.8){camera.position.x*=12.8/r;camera.position.z*=12.8/r}
-    if(!overviewMode)camera.position.y=1.65;camera.rotation.set(pitch,yaw,0);updateZone();updateFocus();updateMap();
+    if(tourActive){updatePanoramaTour(dt);updateZone();updateMap()}else{
+      const forward=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0)-joy.y;
+      const side=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0)+joy.x;
+      if(forward||side){hasDestination=false;scene.userData.clickMarker.visible=false;moveTarget.set(-Math.sin(yaw)*forward+Math.cos(yaw)*side,0,-Math.cos(yaw)*forward-Math.sin(yaw)*side);if(moveTarget.lengthSq()>1)moveTarget.normalize();moveTarget.multiplyScalar(7.4)}
+      else if(hasDestination){moveTarget.set(moveDestination.x-camera.position.x,0,moveDestination.z-camera.position.z);const distance=moveTarget.length();if(distance<.18){hasDestination=false;scene.userData.clickMarker.visible=false;moveTarget.set(0,0,0)}else{const desiredYaw=Math.atan2(-moveTarget.x,-moveTarget.z);yaw=dampAngle(yaw,desiredYaw,1-Math.exp(-7*dt));moveTarget.normalize().multiplyScalar(Math.min(7.2,Math.max(1.3,distance*2.7)))}}
+      else moveTarget.set(0,0,0);
+      moveVelocity.lerp(moveTarget,1-Math.exp(-(moveTarget.lengthSq()>.01?11:8)*dt));camera.position.addScaledVector(moveVelocity,dt);
+      const r=Math.hypot(camera.position.x,camera.position.z);if(r>12.8){camera.position.x*=12.8/r;camera.position.z*=12.8/r}
+      camera.position.y=1.65;camera.rotation.set(pitch,yaw,0);updateZone();updateFocus();updateMap();
+    }
   }
-  const now=performance.now()*.001;(scene.userData.animatedSprites||[]).forEach((sprite,i)=>{sprite.position.y=sprite.userData.baseY+Math.sin(now*1.25+sprite.userData.phase+i*.35)*sprite.userData.floatAmount;sprite.material.rotation=Math.sin(now*.7+sprite.userData.phase)*.008});
+  const now=performance.now()*.001;(scene.userData.animatedSprites||[]).forEach((sprite,i)=>{sprite.position.y=sprite.userData.baseY+Math.sin(now*1.25+sprite.userData.phase+i*.35)*sprite.userData.floatAmount;sprite.material.rotation=Math.sin(now*.7+sprite.userData.phase)*.008});if(scene.userData.clickMarker.visible){const pulse=1+Math.sin(now*5)*.12;scene.userData.clickMarker.scale.setScalar(pulse);scene.userData.clickMarker.material.opacity=.65+Math.sin(now*5)*.2}
   updateCurator(dt,now);
   renderer.render(scene,camera);
 }
@@ -196,12 +200,26 @@ function updateFocus(){
   $('#crosshair').classList.toggle('active',!!hit);$('#focus-hint').classList.toggle('show',!!hit);$('#focus-hint').textContent=hit?.object.userData.type==='curator'?'큐레이터 안내 듣기':'이 작품을 눌러 감상하기';camera.userData.focus=hit?.object||null;
 }
 function activateCenter(){if(camera.userData.focus){const d=camera.userData.focus.userData;if(d.type==='curator')openCurator();else openPoem(d.child,d.poem)}}
-function showOverview(){overviewMode=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,8.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구'}
+function handleWorldClick(x,y){
+  clickPoint.set(x/innerWidth*2-1,-(y/innerHeight)*2+1);raycaster.setFromCamera(clickPoint,camera);
+  const subject=raycaster.intersectObjects(frameMeshes,false)[0];if(subject){const d=subject.object.userData;if(d.type==='curator')openCurator();else openPoem(d.child,d.poem);return}
+  const floorHit=raycaster.intersectObject(scene.userData.floor,false)[0];if(!floorHit)return;
+  moveDestination.copy(floorHit.point);const r=Math.hypot(moveDestination.x,moveDestination.z);if(r>12.45){moveDestination.x*=12.45/r;moveDestination.z*=12.45/r}moveDestination.y=0;hasDestination=true;moveVelocity.multiplyScalar(.35);const marker=scene.userData.clickMarker;marker.position.set(moveDestination.x,.045,moveDestination.z);marker.visible=true;showToast('선택한 곳으로 이동할게요')
+}
+function startPanoramaTour(){
+  hasDestination=false;moveVelocity.set(0,0,0);tourElapsed=0;tourActive=!reduceMotion;$('#tour-guide').hidden=reduceMotion;$('#tour-progress').style.width='0%';camera.fov=76;camera.updateProjectionMatrix();camera.position.set(0,2.15,9.2);yaw=0;pitch=-.045;camera.rotation.set(pitch,yaw,0);if(reduceMotion)finishPanoramaTour();else showToast('먼저 전시장을 한 바퀴 소개할게요')
+}
+function updatePanoramaTour(dt){
+  tourElapsed=Math.min(TOUR_DURATION,tourElapsed+dt);const t=tourElapsed/TOUR_DURATION,e=t*t*(3-2*t),angle=e*Math.PI*2,radius=9.2;camera.position.set(Math.sin(angle)*radius,2.12+Math.sin(angle*2)*.16,Math.cos(angle)*radius);yaw=angle;pitch=-.045+Math.sin(angle)*.018;camera.rotation.set(pitch,yaw,0);$('#tour-progress').style.width=`${Math.round(t*100)}%`;if(t>=1)finishPanoramaTour()
+}
+function finishPanoramaTour(){tourActive=false;$('#tour-guide').hidden=true;moveVelocity.set(0,0,0);camera.position.set(0,1.65,8.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구';showToast(coarsePointer?'바닥을 눌러 이동하고 화면을 밀어 둘러보세요':'바닥 클릭 이동 · 드래그 둘러보기 · 작품 클릭 감상')}
+function dampAngle(a,b,t){let d=(b-a+Math.PI)%(Math.PI*2)-Math.PI;if(d<-Math.PI)d+=Math.PI*2;return a+d*t}
+function showOverview(){tourActive=false;$('#tour-guide').hidden=true;hasDestination=false;scene.userData.clickMarker.visible=false;overviewMode=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,8.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구'}
 function updateMap(){const x=camera.position.x/15*40,z=camera.position.z/15*40;$('#map-dot').style.transform=`translate(${x}px,${z}px)`;$('#map-view').style.transform=`rotate(${-yaw}rad)`}
 function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,coarsePointer?1:1.25))}
 
 function openPoem(ci,pi){
-  moveVelocity.set(0,0,0);mouseDrive.active=false;
+  moveVelocity.set(0,0,0);hasDestination=false;scene.userData.clickMarker.visible=false;
   selectedChild=ci;selectedPoem=pi;modalOpen=true;const c=children[ci],p=c.poems[pi];
   visited.add(`${ci}-${pi}`);localStorage.setItem('galleryVisited',JSON.stringify([...visited]));
   $('.poem-card').style.setProperty('--accent',c.color);$('#poem-child').textContent=c.name;$('#poem-number').textContent=`작품 ${pi+1} / 5`;
@@ -212,7 +230,7 @@ function closePoem(){modalOpen=false;$('#poem-modal').classList.remove('open');$
 function movePoem(step){selectedPoem=(selectedPoem+step+5)%5;openPoem(selectedChild,selectedPoem)}
 function openIndex(){modalOpen=true;$('#index-panel').classList.add('open');$('#index-panel').setAttribute('aria-hidden','false')}
 function closeIndex(){modalOpen=false;$('#index-panel').classList.remove('open');$('#index-panel').setAttribute('aria-hidden','true')}
-function openCurator(){moveVelocity.set(0,0,0);mouseDrive.active=false;modalOpen=true;$('#curator-panel').classList.add('open');$('#curator-panel').setAttribute('aria-hidden','false');setTimeout(()=>$('#curator-close').focus(),200)}
+function openCurator(){moveVelocity.set(0,0,0);hasDestination=false;scene.userData.clickMarker.visible=false;modalOpen=true;$('#curator-panel').classList.add('open');$('#curator-panel').setAttribute('aria-hidden','false');setTimeout(()=>$('#curator-close').focus(),200)}
 function closeCurator(){modalOpen=false;$('#curator-panel').classList.remove('open');$('#curator-panel').setAttribute('aria-hidden','true')}
 function buildIndex(){
   const root=$('#index-list');
