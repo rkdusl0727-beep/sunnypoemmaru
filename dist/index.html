@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <meta name="theme-color" content="#090d18">
+  <meta name="theme-color" content="#ead8bc">
   <meta name="description" content="따뜻한 햇살과 원목이 어우러진 공간에서 10명의 아이가 쓴 50편의 동시를 감상하는 3D 전시">
   <title>햇살 동시 마루 — 3D 전시장</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,24 +21,24 @@
     <p class="kicker">어린이 동시 온라인 전시</p>
     <h1 id="intro-title"><em>햇살</em><br>동시 마루</h1>
     <p>열 명의 작은 시인이 쓴 쉰 편의 동시를<br>360° 전시 공간에서 천천히 만나보세요.</p>
-    <button id="enter" type="button">3D 전시장 입장 <span>→</span></button>
+    <button id="enter" type="button">3D 전시장 입장 <span class="enter-arrow" aria-hidden="true"></span></button>
     <div class="intro-meta"><span>로그인 없이 입장</span><span>PC · 모바일 지원</span></div>
   </section>
 
   <main id="hud" class="hud" hidden>
     <header class="topbar">
-      <button id="home" class="logo" type="button" aria-label="입구로 돌아가기"><b>☀</b><span>햇살 동시 마루</span></button>
+      <button id="home" class="logo" type="button" aria-label="입구로 돌아가기"><b class="brand-mark" aria-hidden="true"><i></i></b><span>햇살 동시 마루</span></button>
       <div class="zone-label"><small>현재 구역</small><strong id="zone-name">중앙 홀</strong></div>
       <div class="top-actions">
-        <button id="overview" class="icon-button" type="button" aria-label="전시장 전체 한눈에 보기">⌂</button>
-        <button id="index-open" class="icon-button" type="button" aria-label="전체 작품 목록">☰</button>
+        <button id="overview" class="icon-button" type="button" aria-label="전시장 전체 한눈에 보기"><span class="overview-icon" aria-hidden="true"><i></i></span></button>
+        <button id="index-open" class="icon-button" type="button" aria-label="전체 작품 목록"><span class="menu-icon" aria-hidden="true"><i></i><i></i><i></i></span></button>
       </div>
     </header>
     <div id="crosshair" class="crosshair" aria-hidden="true"></div>
     <p id="focus-hint" class="focus-hint">이 작품을 눌러 감상하기</p>
     <aside class="mini-map" aria-label="전시장 미니맵">
       <div id="map-dot" class="map-dot"></div><div id="map-view" class="map-view"></div>
-      <span class="map-center">●</span><i class="map-ring"></i>
+      <span class="map-center" aria-hidden="true"></span><i class="map-ring"></i>
     </aside>
     <div class="desktop-help"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>이동</span><i></i><span>드래그하여 둘러보기</span></div>
     <div class="mobile-controls" aria-label="이동 조작">
@@ -49,8 +49,8 @@
 
   <section id="curator-panel" class="curator-panel" aria-hidden="true" aria-labelledby="curator-title">
     <div class="curator-card">
-      <button id="curator-close" type="button" aria-label="큐레이터 안내 닫기">×</button>
-      <div class="curator-face" aria-hidden="true">☺</div>
+      <button id="curator-close" class="close-button" type="button" aria-label="큐레이터 안내 닫기"><span aria-hidden="true"></span></button>
+      <div class="curator-face" aria-hidden="true"><i class="curator-hair"></i><i class="curator-eye left"></i><i class="curator-eye right"></i><i class="curator-smile"></i></div>
       <p class="curator-role">3D 전시 큐레이터 · 마루</p>
       <h2 id="curator-title">반가워요! 전시를 안내할게요.</h2>
       <p>이곳에는 열 명의 어린이가 쓴 동시가 다섯 편씩 전시되어 있어요. 벽면 액자 가까이 이동한 뒤 화면 중앙의 표시가 빛날 때 눌러보세요.</p>
@@ -62,17 +62,17 @@
   <section id="poem-modal" class="poem-modal" aria-hidden="true" aria-labelledby="poem-title">
     <div class="modal-shade" data-close></div>
     <article class="poem-card">
-      <button class="modal-close" type="button" data-close aria-label="작품 닫기">×</button>
+      <button class="modal-close close-button" type="button" data-close aria-label="작품 닫기"><span aria-hidden="true"></span></button>
       <div class="poem-meta"><span id="poem-dot"></span><p>작은 시인<br><strong id="poem-child"></strong></p><em id="poem-number"></em></div>
       <div class="placeholder-badge">실제 작품 교체 전 예시 문구</div>
       <h2 id="poem-title"></h2>
       <p id="poem-body"></p>
-      <footer><button id="prev-poem" type="button">← 이전 작품</button><button id="next-poem" type="button">다음 작품 →</button></footer>
+      <footer><button id="prev-poem" type="button"><span class="nav-arrow previous" aria-hidden="true"></span>이전 작품</button><button id="next-poem" type="button">다음 작품<span class="nav-arrow next" aria-hidden="true"></span></button></footer>
     </article>
   </section>
 
   <aside id="index-panel" class="index-panel" aria-hidden="true" aria-labelledby="index-title">
-    <header><div><small>전체 작품</small><h2 id="index-title">50개의 작은 우주</h2></div><button id="index-close" type="button" aria-label="목록 닫기">×</button></header>
+    <header><div><small>전체 작품</small><h2 id="index-title">50개의 작은 우주</h2></div><button id="index-close" class="close-button" type="button" aria-label="목록 닫기"><span aria-hidden="true"></span></button></header>
     <div id="index-list" class="index-list"></div>
     <p class="data-note">현재 이름·제목·본문은 실제 작품을 넣기 전의 교체용 문구입니다.</p>
   </aside>
