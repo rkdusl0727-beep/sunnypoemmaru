@@ -43,7 +43,7 @@ function buildGallery(){
   const sun=new THREE.DirectionalLight(0xffcb88,3.2);sun.position.set(-8,12,5);sun.target.position.set(2,0,-2);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-18;sun.shadow.camera.right=18;sun.shadow.camera.top=18;sun.shadow.camera.bottom=-18;scene.add(sun,sun.target);
   const sunPatch=new THREE.Mesh(new THREE.CircleGeometry(5.4,48),new THREE.MeshBasicMaterial({color:0xffd699,transparent:true,opacity:.18,depthWrite:false}));sunPatch.rotation.x=-Math.PI/2;sunPatch.position.set(-3,.025,2);scene.add(sunPatch);
   for(let i=0;i<10;i++)buildZone(i);
-  buildCenterSculpture();buildCurator();buildStars();buildCozyDetails();
+  buildCenterSculpture();buildCurator();buildWarmLights();buildCozyDetails();
 }
 
 function buildZone(ci){
@@ -81,7 +81,7 @@ function makePoemTexture(ci,pi){
   x.font='30px Gowun Dodum, sans-serif';x.fillStyle='#364057';
   ['어린이가 쓴 동시를','여기에 넣어주세요.','','가까이 다가와','작품을 눌러 보세요.'].forEach((line,i)=>x.fillText(line,54,300+i*60));
   x.fillStyle='#a9a190';x.font='22px Gowun Dodum, sans-serif';x.fillText(`${pi+1} / 5`,54,790);
-  x.textAlign='right';x.fillStyle=d.color;x.font='52px serif';x.fillText('✦',580,790);
+  x.textAlign='right';x.fillStyle=d.color;x.font='52px serif';x.fillText('❋',580,790);
   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=renderer.capabilities.getMaxAnisotropy();return t;
 }
 function buildCenterSculpture(){
@@ -91,7 +91,7 @@ function buildCenterSculpture(){
   const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.3,.47,3.5,14),new THREE.MeshStandardMaterial({color:0x805332,roughness:.95}));trunk.position.y=2.15;trunk.castShadow=true;g.add(trunk);
   const leafMat=new THREE.MeshStandardMaterial({color:0x91ad71,roughness:.9});
   [[0,4.25,0,1.25],[.8,4.05,.2,.95],[-.85,4.05,.2,1.05],[.25,4.35,-.7,.9],[-.25,4.45,.65,.85]].forEach(v=>{const leaf=new THREE.Mesh(new THREE.SphereGeometry(v[3],20,14),leafMat);leaf.position.set(v[0],v[1],v[2]);leaf.scale.y=.72;leaf.castShadow=true;g.add(leaf)});
-  for(let i=0;i<6;i++){const star=new THREE.Mesh(new THREE.IcosahedronGeometry(.11,0),new THREE.MeshStandardMaterial({color:0xffd06e,emissive:0xc17a24,emissiveIntensity:.75}));const a=i/6*Math.PI*2;star.position.set(Math.sin(a)*1.15,3.25+(i%2)*.35,Math.cos(a)*1.15);g.add(star)}
+  for(let i=0;i<6;i++){const lantern=new THREE.Mesh(new THREE.SphereGeometry(.12,12,9),new THREE.MeshStandardMaterial({color:[0xf4b8a6,0xa9d7c7,0xf2cf7b][i%3],emissive:0xb87935,emissiveIntensity:.22,roughness:.9}));const a=i/6*Math.PI*2;lantern.position.set(Math.sin(a)*1.15,3.25+(i%2)*.35,Math.cos(a)*1.15);g.add(lantern)}
   scene.add(g);scene.userData.sculpture=g;
   const light=new THREE.PointLight(0xffc77a,3.4,10,2);light.position.y=3.5;scene.add(light);
 }
@@ -115,7 +115,7 @@ function buildCurator(){
   const hit=new THREE.Mesh(new THREE.CapsuleGeometry(.58,1.55,5,10),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));hit.position.set(3.4,1.2,3.2);hit.userData={type:'curator'};frameMeshes.push(hit);scene.add(hit);
   const bubble=new THREE.Mesh(new THREE.PlaneGeometry(2.6,.9),new THREE.MeshBasicMaterial({map:makeTextTexture('안녕하세요!','저를 눌러 관람 안내를 받아보세요','#7b5538',900,300),transparent:true,depthTest:false}));bubble.position.set(3.4,3.08,3.18);bubble.lookAt(0,3.08,0);bubble.renderOrder=5;scene.add(bubble);
 }
-function buildStars(){
+function buildWarmLights(){
   const lamps=new THREE.Group();for(let i=0;i<16;i++){const a=i/16*Math.PI*2;const bulb=new THREE.Mesh(new THREE.SphereGeometry(.08,10,8),new THREE.MeshStandardMaterial({color:0xffe0a0,emissive:0xe59d3f,emissiveIntensity:1.5}));bulb.position.set(Math.sin(a)*8.5,5.48,Math.cos(a)*8.5);lamps.add(bulb)}scene.add(lamps);
 }
 function buildCozyDetails(){
@@ -178,7 +178,7 @@ function animate(){
 }
 function updateZone(){
   const r=Math.hypot(camera.position.x,camera.position.z);
-  if(r<4.2){$('#zone-name').textContent='중앙 별빛 홀';return}
+  if(r<4.2){$('#zone-name').textContent='중앙 햇살 마루';return}
   let a=Math.atan2(camera.position.x,camera.position.z);if(a<0)a+=Math.PI*2;
   const i=Math.round(a/(Math.PI*2)*10)%10;$('#zone-name').textContent=`${children[i].name}의 방`;
 }

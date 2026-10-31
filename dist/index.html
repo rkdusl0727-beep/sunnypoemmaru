@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#090d18">
-  <meta name="description" content="10명의 아이가 쓴 50편의 동시를 직접 걸으며 감상하는 3D 파노라마 전시">
-  <title>별빛 동시 정원 — 3D 전시장</title>
+  <meta name="description" content="따뜻한 햇살과 원목이 어우러진 공간에서 10명의 아이가 쓴 50편의 동시를 감상하는 3D 전시">
+  <title>햇살 동시 마루 — 3D 전시장</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
@@ -14,12 +14,12 @@
 <body>
   <a class="skip" href="#index-panel">3D 전시를 건너뛰고 작품 목록 보기</a>
   <canvas id="gallery-canvas" aria-label="마우스나 손가락으로 둘러보고 이동하는 3D 동시 전시장"></canvas>
-  <div id="loading" class="loading"><span></span><p>전시장을 준비하고 있어요</p></div>
+  <div id="loading" class="loading"><span></span><p>포근한 전시방을 준비하고 있어요</p></div>
 
   <section id="intro" class="intro" aria-labelledby="intro-title">
     <div class="intro-orbit" aria-hidden="true"><i></i><i></i><i></i></div>
     <p class="kicker">어린이 동시 온라인 전시</p>
-    <h1 id="intro-title"><em>별빛</em><br>동시 정원</h1>
+    <h1 id="intro-title"><em>햇살</em><br>동시 마루</h1>
     <p>열 명의 작은 시인이 쓴 쉰 편의 동시를<br>360° 전시 공간에서 천천히 만나보세요.</p>
     <button id="enter" type="button">3D 전시장 입장 <span>→</span></button>
     <div class="intro-meta"><span>로그인 없이 입장</span><span>PC · 모바일 지원</span></div>
@@ -27,7 +27,7 @@
 
   <main id="hud" class="hud" hidden>
     <header class="topbar">
-      <button id="home" class="logo" type="button" aria-label="입구로 돌아가기"><b>✦</b><span>별빛 동시 정원</span></button>
+      <button id="home" class="logo" type="button" aria-label="입구로 돌아가기"><b>☀</b><span>햇살 동시 마루</span></button>
       <div class="zone-label"><small>현재 구역</small><strong id="zone-name">중앙 홀</strong></div>
       <div class="top-actions">
         <button id="overview" class="icon-button" type="button" aria-label="전시장 전체 한눈에 보기">⌂</button>
@@ -38,7 +38,7 @@
     <p id="focus-hint" class="focus-hint">이 작품을 눌러 감상하기</p>
     <aside class="mini-map" aria-label="전시장 미니맵">
       <div id="map-dot" class="map-dot"></div><div id="map-view" class="map-view"></div>
-      <span class="map-center">✦</span><i class="map-ring"></i>
+      <span class="map-center">●</span><i class="map-ring"></i>
     </aside>
     <div class="desktop-help"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>이동</span><i></i><span>드래그하여 둘러보기</span></div>
     <div class="mobile-controls" aria-label="이동 조작">
@@ -51,7 +51,7 @@
     <div class="curator-card">
       <button id="curator-close" type="button" aria-label="큐레이터 안내 닫기">×</button>
       <div class="curator-face" aria-hidden="true">☺</div>
-      <p class="curator-role">3D 전시 큐레이터 · 별이</p>
+      <p class="curator-role">3D 전시 큐레이터 · 마루</p>
       <h2 id="curator-title">반가워요! 전시를 안내할게요.</h2>
       <p>이곳에는 열 명의 어린이가 쓴 동시가 다섯 편씩 전시되어 있어요. 벽면 액자 가까이 이동한 뒤 화면 중앙의 표시가 빛날 때 눌러보세요.</p>
       <div class="curator-tips"><span><b>1</b> 드래그해 둘러보기</span><span><b>2</b> 이동해 작품에 다가가기</span><span><b>3</b> 액자를 눌러 감상하기</span></div>
