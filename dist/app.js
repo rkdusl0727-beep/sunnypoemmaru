@@ -3,6 +3,7 @@ import * as THREE from './vendor/three.module.min.js';
 const COLORS=['#ffd464','#82d8c5','#ff8f85','#a99aff','#82bff5','#ffb465','#ec90cc','#94dc84','#7dd1df','#f09c9c'];
 const children=Array.from({length:10},(_,i)=>({id:i+1,name:`어린이 ${String(i+1).padStart(2,'0')}`,color:COLORS[i],poems:Array.from({length:5},(_,j)=>({title:`동시 제목 ${j+1}`,body:`여기에 어린이가 쓴 동시 ${j+1}의\n첫 번째 행을 넣어주세요.\n\n행갈이와 빈 줄도\n그대로 예쁘게 보여요.`}))}));
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const adminMode=document.body.dataset.admin==='true';
 const canvas=$('#gallery-canvas');
 let scene,camera,renderer,clock,raycaster,frameMeshes=[],yaw=0,pitch=0,started=false,modalOpen=false,overviewMode=false;
 let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,lastX=0,lastY=0,keys={},joy={x:0,y:0};
@@ -48,7 +49,7 @@ function init(){
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.18;
   renderer.shadowMap.enabled=!coarsePointer;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   clock=new THREE.Clock();raycaster=new THREE.Raycaster();
-  buildGallery();bind();buildIndex();buildSettings();applyGalleryName(galleryConfig.name,false);applyGalleryTheme(galleryConfig.theme,false);loadStoredScans();renderer.compile(scene,camera);if(renderer.shadowMap.enabled){renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true}animate();
+  buildGallery();bind();buildIndex();if(adminMode)buildSettings();applyGalleryName(galleryConfig.name,false);applyGalleryTheme(galleryConfig.theme,false);loadStoredScans();renderer.compile(scene,camera);if(renderer.shadowMap.enabled){renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true}animate();
   setTimeout(()=>$('#loading').classList.add('done'),450);
 }
 
@@ -108,7 +109,7 @@ function loadGalleryConfig(){try{const saved=JSON.parse(localStorage.getItem('ga
 function saveGalleryConfig(){localStorage.setItem('galleryConfig',JSON.stringify(galleryConfig))}
 function applyGalleryName(name,persist=true){
   const clean=(name||DEFAULT_GALLERY_CONFIG.name).trim().slice(0,30)||DEFAULT_GALLERY_CONFIG.name,parts=clean.split(/\s+/),first=parts.shift(),rest=parts.join(' ');galleryConfig.name=clean;
-  const title=$('#intro-title'),accent=document.createElement('em');accent.textContent=first;title.replaceChildren(accent);if(rest)title.append(document.createElement('br'),document.createTextNode(rest));$('.logo span').textContent=clean;document.title=`${clean} — 3D 전시장`;$('#gallery-name').value=clean;if(persist)saveGalleryConfig()
+  const title=$('#intro-title'),accent=document.createElement('em');accent.textContent=first;title.replaceChildren(accent);if(rest)title.append(document.createElement('br'),document.createTextNode(rest));$('.logo span').textContent=clean;document.title=`${clean}${adminMode?' 관리자':''} — 3D 전시장`;if($('#gallery-name'))$('#gallery-name').value=clean;if(persist)saveGalleryConfig()
 }
 function applyGalleryTheme(theme,persist=true){
   const selected=theme==='white'?'white':'warm',t=scene.userData.theme;galleryConfig.theme=selected;document.body.dataset.galleryTheme=selected;
@@ -167,7 +168,7 @@ function makePngSprite(url,width,height,position,floatAmount=0,phase=0){
 
 function bind(){
   addEventListener('resize',resize);
-  addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key==='Escape'){closePoem();closeIndex();closeSettings();stopGuideVoice()}});
+  addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key==='Escape'){closePoem();closeIndex();if(adminMode)closeSettings();stopGuideVoice()}});
   addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
   canvas.addEventListener('pointerdown',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;dragging=true;dragMoved=false;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId)});
   canvas.addEventListener('pointermove',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive||!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;if(Math.abs(dx)+Math.abs(dy)>3)dragMoved=true;yaw-=dx*.0042;pitch=THREE.MathUtils.clamp(pitch-dy*.0034,PITCH_MIN,PITCH_MAX);lastX=e.clientX;lastY=e.clientY});
@@ -177,7 +178,7 @@ function bind(){
   $('#enter').onclick=()=>{started=true;$('#intro').classList.add('closed');$('#hud').hidden=false;startAmbientMusic();startEntrySequence()};
   $('#home').onclick=()=>{$('#intro').classList.remove('closed');$('#hud').hidden=true;$('#hud').classList.remove('cinematic');started=false;tourActive=false;entryActive=false;zoneTravelActive=false;hasDestination=false;resetEntrance();stopAmbientMusic();stopGuideVoice()};
   $('#music-toggle').onclick=()=>musicOn?stopAmbientMusic():startAmbientMusic();
-  $('#overview').onclick=showOverview;$('#index-open').onclick=openIndex;$('#index-close').onclick=closeIndex;$('#settings-open').onclick=openSettings;$('#settings-close').onclick=closeSettings;
+  $('#overview').onclick=showOverview;$('#index-open').onclick=openIndex;$('#index-close').onclick=closeIndex;if(adminMode){$('#settings-open').onclick=openSettings;$('#settings-close').onclick=closeSettings}
   $$('[data-close]').forEach(b=>b.onclick=closePoem);
   $('#prev-poem').onclick=()=>movePoem(-1);$('#next-poem').onclick=()=>movePoem(1);bindJoystick();
 }
@@ -290,8 +291,8 @@ function closePoem(){modalOpen=false;$('#poem-modal').classList.remove('open');$
 function movePoem(step){selectedPoem=(selectedPoem+step+5)%5;openPoem(selectedChild,selectedPoem)}
 function openIndex(){modalOpen=true;$('#index-panel').classList.add('open');$('#index-panel').setAttribute('aria-hidden','false')}
 function closeIndex(){modalOpen=false;$('#index-panel').classList.remove('open');$('#index-panel').setAttribute('aria-hidden','true')}
-function openSettings(){closeIndex();closePoem();modalOpen=true;$('#settings-panel').classList.add('open');$('#settings-panel').setAttribute('aria-hidden','false');setTimeout(()=>$('#settings-close').focus(),220)}
-function closeSettings(){modalOpen=false;$('#settings-panel').classList.remove('open');$('#settings-panel').setAttribute('aria-hidden','true')}
+function openSettings(){if(!adminMode)return;closeIndex();closePoem();modalOpen=true;$('#settings-panel').classList.add('open');$('#settings-panel').setAttribute('aria-hidden','false');setTimeout(()=>$('#settings-close').focus(),220)}
+function closeSettings(){if(!adminMode)return;modalOpen=false;$('#settings-panel').classList.remove('open');$('#settings-panel').setAttribute('aria-hidden','true')}
 function getNaturalKoreanVoice(){
   if(!('speechSynthesis' in window))return null;const voices=speechSynthesis.getVoices(),korean=voices.filter(v=>/^ko([-_]|$)/i.test(v.lang));
   return korean.find(v=>/natural|premium|enhanced|yuna|sunhi|sora|heami|google/i.test(v.name))||null
@@ -315,7 +316,7 @@ function buildSettings(){
   $$('[data-scan-input]').forEach(input=>input.onchange=async()=>{const file=input.files?.[0],key=input.dataset.scanInput;input.value='';if(!file)return;const [ci,pi]=key.split('-').map(Number);try{setScanStatus(`${children[ci].name}의 ${pi+1}번째 원본을 준비하고 있어요.`);const record=await createScanRecord(key,ci,pi,file);await putScanRecord(record);scanRecords.set(key,record);applyScanTexture(record);updateScanSlot(record);if(selectedChild===ci&&selectedPoem===pi&&$('#poem-modal').classList.contains('open'))showPoemScan(ci,pi);setScanStatus(`${children[ci].name}의 ${pi+1}번째 원본을 저장했어요.`)}catch(error){setScanStatus(error?.message||'원본 파일을 저장하지 못했어요.',true)}});
   $$('[data-scan-remove]').forEach(button=>button.onclick=async()=>{const key=button.dataset.scanRemove,[ci,pi]=key.split('-').map(Number);try{await deleteScanRecord(key);scanRecords.delete(key);restorePlaceholderTexture(ci,pi);updateScanSlot({key,name:''});if(selectedChild===ci&&selectedPoem===pi&&$('#poem-modal').classList.contains('open'))showPoemScan(ci,pi);setScanStatus(`${children[ci].name}의 ${pi+1}번째 원본을 삭제했어요.`)}catch{setScanStatus('원본을 삭제하지 못했어요.',true)}})
 }
-function setScanStatus(message,isError=false){const status=$('#scan-status');status.textContent=message;status.classList.toggle('error',isError)}
+function setScanStatus(message,isError=false){const status=$('#scan-status');if(!status)return;status.textContent=message;status.classList.toggle('error',isError)}
 function openScanDb(){
   if(scanDbPromise)return scanDbPromise;if(!('indexedDB' in window))return Promise.reject(new Error('이 브라우저에서는 원본 저장 기능을 사용할 수 없어요.'));
   scanDbPromise=new Promise((resolve,reject)=>{const request=indexedDB.open(SCAN_DB_NAME,1);request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains(SCAN_STORE))db.createObjectStore(SCAN_STORE,{keyPath:'key'})};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)});return scanDbPromise
