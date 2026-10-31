@@ -8,7 +8,7 @@ let scene,camera,renderer,clock,raycaster,frameMeshes=[],yaw=0,pitch=0,started=f
 let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,lastX=0,lastY=0,keys={},joy={x:0,y:0};
 let tourActive=false,tourElapsed=0,entryActive=false,entryElapsed=0,hasDestination=false;
 let audioContext,audioMaster,musicTimer,musicStep=0,musicOn=true;
-let guideUtterance=null;
+let guideUtterance=null,contactShadowTexture=null;
 const coarsePointer=matchMedia('(pointer:coarse)').matches||innerWidth<800,reduceMotion=matchMedia('(prefers-reduced-motion:reduce)').matches,moveVelocity=new THREE.Vector3(),moveTarget=new THREE.Vector3(),moveDestination=new THREE.Vector3(),curatorTarget=new THREE.Vector3(),clickPoint=new THREE.Vector2();
 const cameraPos=new THREE.Vector3(0,1.65,11.2);
 const TOUR_DURATION=10;
@@ -47,7 +47,7 @@ function buildGallery(){
   scene.add(new THREE.AmbientLight(0xfff0d5,1.05));
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(30.6,26.8),new THREE.MeshStandardMaterial({map:scene.userData.floorTexture,color:0xffffff,roughness:.88,metalness:0}));
   floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;floor.userData.type='floor';scene.add(floor);scene.userData.floor=floor;
-  const marker=new THREE.Mesh(new THREE.RingGeometry(.2,.32,32),new THREE.MeshBasicMaterial({color:0xb87538,transparent:true,opacity:.88,side:THREE.DoubleSide,depthWrite:false}));marker.rotation.x=-Math.PI/2;marker.position.y=.045;marker.visible=false;scene.add(marker);scene.userData.clickMarker=marker;
+  const marker=new THREE.Mesh(new THREE.RingGeometry(.2,.32,32),new THREE.MeshBasicMaterial({color:0xb87538,transparent:true,opacity:.88,side:THREE.DoubleSide,depthWrite:false}));marker.rotation.x=-Math.PI/2;marker.position.y=.018;marker.visible=false;scene.add(marker);scene.userData.clickMarker=marker;
   const ceiling=new THREE.Mesh(new THREE.PlaneGeometry(30.8,27),new THREE.MeshStandardMaterial({color:0xfff4df,roughness:.92,side:THREE.DoubleSide}));
   ceiling.rotation.x=Math.PI/2;ceiling.position.y=5.7;scene.add(ceiling);
   const canopy=new THREE.Mesh(new THREE.PlaneGeometry(9.4,26.6),new THREE.MeshStandardMaterial({map:scene.userData.cottonTexture,color:0xfffbf3,transparent:true,opacity:.46,roughness:1,side:THREE.DoubleSide,depthWrite:false}));
@@ -107,21 +107,28 @@ function makePoemTexture(ci,pi){
   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),coarsePointer?2:4);return t;
 }
 function buildCenterSculpture(){
-  const g=makePngSprite('assets/centerpiece-tree.png',6.8,6.05,[0,3,0],.025);g.material.depthWrite=true;g.material.depthTest=true;g.renderOrder=1;scene.userData.sculpture=g;
+  const g=makePngSprite('assets/centerpiece-tree.png',6.8,6.05,[0,3,0]);g.material.depthWrite=true;g.material.depthTest=true;g.renderOrder=1;scene.userData.sculpture=g;
+  makeContactShadow(0,0,6.4,4.35,.24);
   const light=new THREE.PointLight(0xffc77a,3.4,11,2);light.position.set(0,3.65,0);scene.add(light);
 }
 function buildPlant(x,z){
-  makePngSprite('assets/planter-png.png',1.12,1.42,[x,.71,z],.012,x*.17+z*.11);
+  makePngSprite('assets/planter-png.png',1.12,1.42,[x,.69,z]);makeContactShadow(x,z,.8,.34,.19);
 }
 function buildCurator(){
   const loader=new THREE.TextureLoader(),textures={idle:loader.load('assets/curator-maru.png'),frontA:loader.load('assets/curator-walk-a.png'),frontB:loader.load('assets/curator-walk-b.png'),sideA:loader.load('assets/curator-side-a.png'),sideB:loader.load('assets/curator-side-b.png'),backA:loader.load('assets/curator-back-a.png'),backB:loader.load('assets/curator-back-b.png')};Object.values(textures).forEach(t=>t.colorSpace=THREE.SRGBColorSpace);
-  const g=new THREE.Sprite(new THREE.SpriteMaterial({map:textures.idle,transparent:true,alphaTest:.04,depthWrite:false}));g.scale.set(1.28,1.92,1);g.position.set(1.35,.98,6.7);g.renderOrder=4;g.userData={type:'curator',textures,currentTexture:textures.idle,facing:'front'};scene.add(g);scene.userData.curator=g;frameMeshes.push(g);
+  const g=new THREE.Sprite(new THREE.SpriteMaterial({map:textures.idle,transparent:true,alphaTest:.04,depthWrite:false}));g.scale.set(1.28,1.92,1);g.position.set(1.35,.96,6.7);g.visible=false;g.renderOrder=4;g.userData={type:'curator',textures,currentTexture:textures.idle,facing:'front'};scene.add(g);scene.userData.curator=g;frameMeshes.push(g);
+  const shadow=makeContactShadow(g.position.x,g.position.z,.86,.34,.24);shadow.visible=false;scene.userData.curatorShadow=shadow;
 }
 function buildWarmLights(){
-  const lamps=new THREE.Group();for(let i=0;i<16;i++){const a=i/16*Math.PI*2;const bulb=new THREE.Mesh(new THREE.SphereGeometry(.08,10,8),new THREE.MeshStandardMaterial({color:0xffe0a0,emissive:0xe59d3f,emissiveIntensity:1.5}));bulb.position.set(Math.sin(a)*8.5,5.48,Math.cos(a)*8.5);lamps.add(bulb)}scene.add(lamps);
+  const lamps=new THREE.Group(),cordMaterial=new THREE.MeshStandardMaterial({color:0x9b7652,roughness:1});for(let i=0;i<16;i++){const a=i/16*Math.PI*2,x=Math.sin(a)*8.5,z=Math.cos(a)*8.5,bulb=new THREE.Mesh(new THREE.SphereGeometry(.08,10,8),new THREE.MeshStandardMaterial({color:0xffe0a0,emissive:0xe59d3f,emissiveIntensity:1.5})),cord=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,.18,6),cordMaterial);bulb.position.set(x,5.48,z);cord.position.set(x,5.61,z);lamps.add(cord,bulb)}scene.add(lamps);
 }
 function buildCozyDetails(){
-  [[-5.4,4.6,-1.4],[5.5,4.55,-2.7],[-2.3,4.65,6]].forEach((p,i)=>makePngSprite('assets/cotton-mobile.png',3.9,2.6,p,.025,i*.9));
+  [[-5.4,4.4,-1.4],[5.5,4.4,-2.7],[-2.3,4.4,6]].forEach((p,i)=>makePngSprite('assets/cotton-mobile.png',3.9,2.6,p,0,i*.9));
+}
+
+function makeContactShadow(x,z,width,depth,opacity=.2){
+  if(!contactShadowTexture){const c=document.createElement('canvas');c.width=c.height=128;const ctx=c.getContext('2d'),g=ctx.createRadialGradient(64,64,5,64,64,62);g.addColorStop(0,'rgba(70,42,22,.72)');g.addColorStop(.48,'rgba(70,42,22,.3)');g.addColorStop(1,'rgba(70,42,22,0)');ctx.fillStyle=g;ctx.fillRect(0,0,128,128);contactShadowTexture=new THREE.CanvasTexture(c);contactShadowTexture.colorSpace=THREE.SRGBColorSpace}
+  const shadow=new THREE.Mesh(new THREE.PlaneGeometry(width,depth),new THREE.MeshBasicMaterial({map:contactShadowTexture,transparent:true,opacity,depthWrite:false,toneMapped:false}));shadow.rotation.x=-Math.PI/2;shadow.position.set(x,.012,z);shadow.renderOrder=0;scene.add(shadow);return shadow
 }
 
 function makePngSprite(url,width,height,position,floatAmount=0,phase=0){
@@ -165,20 +172,20 @@ function animate(){
       camera.position.y=1.65;camera.rotation.set(pitch,yaw,0);updateZone();updateFocus();updateMap();
     }
   }
-  const now=performance.now()*.001;(scene.userData.animatedSprites||[]).forEach((sprite,i)=>{sprite.position.y=sprite.userData.baseY+Math.sin(now*1.25+sprite.userData.phase+i*.35)*sprite.userData.floatAmount;sprite.material.rotation=Math.sin(now*.7+sprite.userData.phase)*.008});if(scene.userData.clickMarker.visible){const pulse=1+Math.sin(now*5)*.12;scene.userData.clickMarker.scale.setScalar(pulse);scene.userData.clickMarker.material.opacity=.65+Math.sin(now*5)*.2}
+  const now=performance.now()*.001;(scene.userData.animatedSprites||[]).forEach((sprite,i)=>{const amount=sprite.userData.floatAmount;sprite.position.y=sprite.userData.baseY+Math.sin(now*1.25+sprite.userData.phase+i*.35)*amount;sprite.material.rotation=amount?Math.sin(now*.7+sprite.userData.phase)*.008:0});if(scene.userData.clickMarker.visible){const pulse=1+Math.sin(now*5)*.12;scene.userData.clickMarker.scale.setScalar(pulse);scene.userData.clickMarker.material.opacity=.65+Math.sin(now*5)*.2}
   updateCurator(dt,now);
   renderer.render(scene,camera);
 }
 
 function updateCurator(dt,now){
-  const curator=scene.userData.curator;if(!curator||!started)return;
-  curator.visible=!entryActive;if(entryActive)return;
-  curatorTarget.set(camera.position.x-Math.sin(yaw)*3+Math.cos(yaw)*.95,1.02+Math.sin(now*2)*.035,camera.position.z-Math.cos(yaw)*3-Math.sin(yaw)*.95);
+  const curator=scene.userData.curator,shadow=scene.userData.curatorShadow;if(!curator)return;
+  const hidden=!started||entryActive||tourActive;curator.visible=!hidden;if(shadow)shadow.visible=!hidden;if(hidden)return;
+  curatorTarget.set(camera.position.x-Math.sin(yaw)*3+Math.cos(yaw)*.95,.96,camera.position.z-Math.cos(yaw)*3-Math.sin(yaw)*.95);
   curatorTarget.x=THREE.MathUtils.clamp(curatorTarget.x,-13.15,13.15);curatorTarget.z=THREE.MathUtils.clamp(curatorTarget.z,-11.45,11.45);
   const step=Math.floor(now*5.5)%2?'A':'B',motion=curatorTarget.clone().sub(curator.position),walking=moveVelocity.lengthSq()>.16||motion.lengthSq()>.018,rightX=Math.cos(yaw),rightZ=-Math.sin(yaw),forwardX=-Math.sin(yaw),forwardZ=-Math.cos(yaw),screenX=motion.x*rightX+motion.z*rightZ,depth=motion.x*forwardX+motion.z*forwardZ;let facing='front';if(walking&&Math.abs(screenX)>Math.abs(depth)*.68)facing='side';else if(walking&&depth>0)facing='back';const tex=walking?curator.userData.textures[`${facing}${step}`]:curator.userData.textures.idle;
   curator.scale.x=facing==='side'&&screenX>0?-1.28:1.28;curator.userData.facing=facing;
   if(curator.userData.currentTexture!==tex){curator.material.map=tex;curator.material.needsUpdate=true;curator.userData.currentTexture=tex}curator.material.rotation=walking?Math.sin(now*11)*.018:Math.sin(now*1.4)*.006;
-  curatorTarget.y=walking?1.02+Math.abs(Math.sin(now*11))*.045:1.02+Math.sin(now*1.8)*.018;curator.position.lerp(curatorTarget,1-Math.exp(-6.5*dt));
+  curatorTarget.y=walking?.96+Math.abs(Math.sin(now*11))*.035:.96+Math.sin(now*1.8)*.006;curator.position.lerp(curatorTarget,1-Math.exp(-6.5*dt));if(shadow){shadow.position.x=curator.position.x;shadow.position.z=curator.position.z;shadow.material.opacity=walking?.19:.24}
 }
 
 function startAmbientMusic(){
@@ -208,7 +215,7 @@ function handleWorldClick(x,y){
   const subject=raycaster.intersectObjects(frameMeshes,false)[0];if(subject){const d=subject.object.userData;if(d.type==='curator')speakCurator();else openPoem(d.child,d.poem);return}
   const floorHit=raycaster.intersectObject(scene.userData.floor,false)[0];let usedOpenSpace=false;
   if(floorHit)moveDestination.copy(floorHit.point);else{const direction=raycaster.ray.direction.clone();direction.y=0;if(direction.lengthSq()<.01)return;direction.normalize();moveDestination.copy(camera.position).addScaledVector(direction,6);usedOpenSpace=true}
-  moveDestination.y=0;constrainWalkPosition(moveDestination);hasDestination=true;moveVelocity.multiplyScalar(.35);const marker=scene.userData.clickMarker;marker.position.set(moveDestination.x,.045,moveDestination.z);marker.visible=true
+  moveDestination.y=0;constrainWalkPosition(moveDestination);hasDestination=true;moveVelocity.multiplyScalar(.35);const marker=scene.userData.clickMarker;marker.position.set(moveDestination.x,.018,moveDestination.z);marker.visible=true
 }
 function constrainWalkPosition(position){
   let adjusted=false,x=THREE.MathUtils.clamp(position.x,WALK_BOUNDS.minX,WALK_BOUNDS.maxX),z=THREE.MathUtils.clamp(position.z,WALK_BOUNDS.minZ,WALK_BOUNDS.maxZ);if(x!==position.x||z!==position.z)adjusted=true;position.x=x;position.z=z;
