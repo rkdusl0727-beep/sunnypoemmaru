@@ -104,14 +104,7 @@ function makePoemTexture(ci,pi){
   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=renderer.capabilities.getMaxAnisotropy();return t;
 }
 function buildCenterSculpture(){
-  const g=new THREE.Group();
-  const rug=new THREE.Mesh(new THREE.CylinderGeometry(3.3,3.3,.055,64),new THREE.MeshStandardMaterial({map:scene.userData.cottonTexture,color:0xf0d7ba,roughness:1}));rug.position.y=.04;g.add(rug);
-  const bench=new THREE.Mesh(new THREE.TorusGeometry(2.15,.34,18,80),new THREE.MeshStandardMaterial({color:0xb87843,roughness:.8}));bench.rotation.x=Math.PI/2;bench.position.y=.48;bench.castShadow=true;g.add(bench);
-  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.3,.47,3.5,14),new THREE.MeshStandardMaterial({color:0x805332,roughness:.95}));trunk.position.y=2.15;trunk.castShadow=true;g.add(trunk);
-  const leafMat=new THREE.MeshStandardMaterial({color:0x91ad71,roughness:.9});
-  [[0,4.25,0,1.25],[.8,4.05,.2,.95],[-.85,4.05,.2,1.05],[.25,4.35,-.7,.9],[-.25,4.45,.65,.85]].forEach(v=>{const leaf=new THREE.Mesh(new THREE.SphereGeometry(v[3],20,14),leafMat);leaf.position.set(v[0],v[1],v[2]);leaf.scale.y=.72;leaf.castShadow=true;g.add(leaf)});
-  for(let i=0;i<6;i++){const lantern=new THREE.Mesh(new THREE.SphereGeometry(.12,12,9),new THREE.MeshStandardMaterial({color:[0xf4b8a6,0xa9d7c7,0xf2cf7b][i%3],emissive:0xb87935,emissiveIntensity:.22,roughness:.9}));const a=i/6*Math.PI*2;lantern.position.set(Math.sin(a)*1.15,3.25+(i%2)*.35,Math.cos(a)*1.15);g.add(lantern)}
-  scene.add(g);scene.userData.sculpture=g;
+  const g=makePngSprite('assets/centerpiece-tree.png',6.4,5.85,[0,2.88,0],.035);scene.userData.sculpture=g;
   const light=new THREE.PointLight(0xffc77a,3.4,10,2);light.position.y=3.5;scene.add(light);
 }
 function buildPlant(angle,radius){
@@ -122,15 +115,7 @@ function buildPlant(angle,radius){
   g.position.set(Math.sin(angle)*radius,0,Math.cos(angle)*radius);g.rotation.y=angle+Math.PI;scene.add(g);
 }
 function buildCurator(){
-  const g=new THREE.Group(),skin=new THREE.MeshStandardMaterial({color:0xf3bf91,roughness:.9}),hair=new THREE.MeshStandardMaterial({color:0x5b3927,roughness:.95}),shirt=new THREE.MeshStandardMaterial({color:0xe5a94e,roughness:.85}),pants=new THREE.MeshStandardMaterial({color:0x6e5949,roughness:.9});
-  const legs=[-.18,.18].map(x=>{const leg=new THREE.Mesh(new THREE.CylinderGeometry(.1,.11,.8,10),pants);leg.position.set(x,.65,0);g.add(leg);return leg});
-  const body=new THREE.Mesh(new THREE.CapsuleGeometry(.34,.72,5,10),shirt);body.position.y=1.45;g.add(body);
-  [-1,1].forEach(s=>{const arm=new THREE.Mesh(new THREE.CylinderGeometry(.075,.085,.72,10),shirt);arm.position.set(s*.43,1.48,0);arm.rotation.z=s*.22;g.add(arm)});
-  const head=new THREE.Mesh(new THREE.SphereGeometry(.3,18,14),skin);head.position.y=2.2;g.add(head);
-  const cap=new THREE.Mesh(new THREE.SphereGeometry(.305,18,10,0,Math.PI*2,0,Math.PI*.55),hair);cap.position.y=2.23;g.add(cap);
-  const eyeMat=new THREE.MeshBasicMaterial({color:0x3d2b22});[-.105,.105].forEach(x=>{const eye=new THREE.Mesh(new THREE.SphereGeometry(.025,8,6),eyeMat);eye.position.set(x,2.23,.285);g.add(eye)});
-  const badge=new THREE.Mesh(new THREE.CircleGeometry(.1,16),new THREE.MeshBasicMaterial({color:0xfff3d2}));badge.position.set(0,1.58,.35);g.add(badge);
-  g.position.set(3.4,0,3.2);g.rotation.y=-2.35;scene.add(g);scene.userData.curator=g;
+  const g=makePngSprite('assets/curator-maru.png',2.05,3.08,[3.4,1.53,3.2],.055);g.renderOrder=3;scene.userData.curator=g;
   const hit=new THREE.Mesh(new THREE.CapsuleGeometry(.58,1.55,5,10),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));hit.position.set(3.4,1.2,3.2);hit.userData={type:'curator'};frameMeshes.push(hit);scene.add(hit);
   const bubble=new THREE.Mesh(new THREE.PlaneGeometry(2.6,.9),new THREE.MeshBasicMaterial({map:makeTextTexture('안녕하세요!','저를 눌러 관람 안내를 받아보세요','#7b5538',900,300),transparent:true,depthTest:false}));bubble.position.set(3.4,3.08,3.18);bubble.lookAt(0,3.08,0);bubble.renderOrder=5;scene.add(bubble);
 }
@@ -138,24 +123,14 @@ function buildWarmLights(){
   const lamps=new THREE.Group();for(let i=0;i<16;i++){const a=i/16*Math.PI*2;const bulb=new THREE.Mesh(new THREE.SphereGeometry(.08,10,8),new THREE.MeshStandardMaterial({color:0xffe0a0,emissive:0xe59d3f,emissiveIntensity:1.5}));bulb.position.set(Math.sin(a)*8.5,5.48,Math.cos(a)*8.5);lamps.add(bulb)}scene.add(lamps);
 }
 function buildCozyDetails(){
-  const pastel=[0xf4b8a6,0xa9d7c7,0xf2cf7b,0xbcb1dc,0x9ec7df,0xd9a7c2];
-  for(let i=0;i<8;i++){
-    const a=i/8*Math.PI*2+.2,r=3.25+(i%2)*.65;
-    const cushion=new THREE.Mesh(new THREE.CylinderGeometry(.48,.54,.18,24),new THREE.MeshStandardMaterial({map:scene.userData.cottonTexture,color:pastel[i%pastel.length],roughness:1}));
-    cushion.position.set(Math.sin(a)*r,.13,Math.cos(a)*r);cushion.scale.z=.78;cushion.rotation.y=-a;cushion.castShadow=true;scene.add(cushion);
-  }
-  const cordMat=new THREE.MeshBasicMaterial({color:0x8b6548});
-  const cord=new THREE.Mesh(new THREE.TorusGeometry(8.5,.015,6,96),cordMat);cord.rotation.x=Math.PI/2;cord.position.y=5.12;scene.add(cord);
-  for(let i=0;i<24;i++){
-    const a=i/24*Math.PI*2,c= pastel[i%pastel.length];
-    const flag=new THREE.Mesh(new THREE.ConeGeometry(.18,.42,3),new THREE.MeshStandardMaterial({color:c,roughness:.9,side:THREE.DoubleSide}));
-    flag.position.set(Math.sin(a)*8.5,4.87,Math.cos(a)*8.5);flag.rotation.y=a;flag.rotation.z=Math.PI;scene.add(flag);
-  }
-  [[-5.2,5.05,-1.5],[5.5,4.95,-2.6],[-2.2,5.12,5.8]].forEach((p,idx)=>{
-    const cloud=new THREE.Group(),mat=new THREE.MeshStandardMaterial({color:0xfffaf0,roughness:1});
-    [[0,0,0,.34],[.34,-.04,0,.27],[-.32,-.05,0,.25],[.08,.18,0,.24]].forEach(v=>{const puff=new THREE.Mesh(new THREE.SphereGeometry(v[3],14,10),mat);puff.position.set(v[0],v[1],v[2]);cloud.add(puff)});
-    cloud.position.set(...p);cloud.rotation.y=idx*.8;scene.add(cloud);
-  });
+  [[-5.4,4.6,-1.4],[5.5,4.55,-2.7],[-2.3,4.65,6]].forEach((p,i)=>makePngSprite('assets/cotton-mobile.png',3.9,2.6,p,.025,i*.9));
+}
+
+function makePngSprite(url,width,height,position,floatAmount=0,phase=0){
+  const map=new THREE.TextureLoader().load(url);map.colorSpace=THREE.SRGBColorSpace;
+  const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map,transparent:true,alphaTest:.04,depthWrite:false}));
+  sprite.scale.set(width,height,1);sprite.position.set(...position);sprite.userData.baseY=position[1];sprite.userData.floatAmount=floatAmount;sprite.userData.phase=phase;
+  scene.add(sprite);(scene.userData.animatedSprites??=[]).push(sprite);return sprite;
 }
 
 function bind(){
@@ -192,7 +167,7 @@ function animate(){
     if(r>12.8){camera.position.x*=12.8/r;camera.position.z*=12.8/r}
     if(!overviewMode)camera.position.y=1.65;camera.rotation.set(pitch,yaw,0);updateZone();updateFocus();updateMap();
   }
-  if(scene.userData.sculpture){scene.userData.sculpture.rotation.y=Math.sin(performance.now()*.00012)*.02}
+  const now=performance.now()*.001;(scene.userData.animatedSprites||[]).forEach((sprite,i)=>{sprite.position.y=sprite.userData.baseY+Math.sin(now*1.25+sprite.userData.phase+i*.35)*sprite.userData.floatAmount;sprite.material.rotation=Math.sin(now*.7+sprite.userData.phase)*.008});
   renderer.render(scene,camera);
 }
 function updateZone(){
