@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1b35">
+  <meta name="description" content="10명의 아이가 쓴 50편의 동시를 별처럼 탐험하는 3D 가상 전시">
+  <title>별빛 동시 정원</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#gallery">전시 바로가기</a>
+  <div class="noise" aria-hidden="true"></div>
+
+  <section id="welcome" class="welcome" aria-labelledby="welcome-title">
+    <div class="welcome-stars" aria-hidden="true"></div>
+    <p class="eyebrow">어린이 동시 온라인 전시</p>
+    <h1 id="welcome-title"><span>별빛</span> 동시 정원</h1>
+    <p class="welcome-copy">열 명의 아이가 마음속에서 길어 올린<br>쉰 편의 작은 우주를 만나보세요.</p>
+    <button id="enter-button" class="primary-button" type="button">정원으로 들어가기 <span aria-hidden="true">→</span></button>
+    <p class="welcome-note">로그인 없이 바로 입장 · 모바일과 PC 지원</p>
+  </section>
+
+  <main id="gallery" class="gallery" hidden>
+    <header class="topbar">
+      <button id="home-button" class="brand" type="button" aria-label="처음 화면으로">
+        <span class="brand-mark" aria-hidden="true">✦</span>
+        <span>별빛 동시 정원</span>
+      </button>
+      <div class="progress-wrap" aria-label="관람한 어린이 수">
+        <span id="progress-text">0 / 10 별을 만났어요</span>
+        <div class="progress-track"><span id="progress-bar"></span></div>
+      </div>
+      <button id="list-button" class="round-button" type="button" aria-label="작품 목록 열기">☰</button>
+    </header>
+
+    <section class="scene-shell" aria-label="3D 동시 전시 공간">
+      <div id="scene" class="scene">
+        <div class="sky-glow glow-one" aria-hidden="true"></div>
+        <div class="sky-glow glow-two" aria-hidden="true"></div>
+        <div id="star-field" class="star-field" aria-hidden="true"></div>
+        <div class="world" id="world">
+          <div class="horizon" aria-hidden="true"></div>
+          <div class="garden-ring" aria-hidden="true"></div>
+          <div id="child-stars" class="child-stars"></div>
+          <div class="center-sign" aria-hidden="true">
+            <span>✦</span>
+            <strong>별을 눌러<br>동시를 만나보세요</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="scene-guide">
+        <button id="prev-star" type="button" aria-label="이전 별">←</button>
+        <p><strong id="guide-name">별을 선택해 보세요</strong><span id="guide-index">천천히 둘러봐도 좋아요</span></p>
+        <button id="next-star" type="button" aria-label="다음 별">→</button>
+      </div>
+    </section>
+
+    <aside id="poem-panel" class="poem-panel" aria-hidden="true" aria-labelledby="panel-child-name">
+      <div class="panel-backdrop" data-close-panel></div>
+      <article class="panel-card">
+        <button class="panel-close" type="button" data-close-panel aria-label="작품 창 닫기">×</button>
+        <div class="child-heading">
+          <div id="panel-avatar" class="panel-avatar" aria-hidden="true"></div>
+          <div><p>작은 시인</p><h2 id="panel-child-name"></h2></div>
+        </div>
+        <div id="poem-tabs" class="poem-tabs" role="tablist" aria-label="동시 선택"></div>
+        <div class="poem-sheet">
+          <p id="placeholder-label" class="placeholder-label">교체용 예시 문구</p>
+          <h3 id="poem-title"></h3>
+          <p id="poem-body" class="poem-body"></p>
+          <p id="poem-count" class="poem-count"></p>
+        </div>
+        <div class="panel-nav">
+          <button id="prev-poem" type="button">← 이전 동시</button>
+          <button id="next-poem" type="button">다음 동시 →</button>
+        </div>
+      </article>
+    </aside>
+
+    <aside id="list-panel" class="list-panel" aria-hidden="true" aria-labelledby="list-title">
+      <div class="list-head"><div><p>전체 작품</p><h2 id="list-title">50개의 작은 우주</h2></div><button id="list-close" type="button" aria-label="목록 닫기">×</button></div>
+      <div id="child-list" class="child-list"></div>
+      <p class="content-note">현재 이름·제목·본문은 실제 작품을 넣기 전의 교체용 문구입니다.</p>
+    </aside>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
