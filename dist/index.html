@@ -2,95 +2,67 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0f1b35">
-  <meta name="description" content="10명의 아이가 쓴 50편의 동시를 별처럼 탐험하는 3D 가상 전시">
-  <title>별빛 동시 정원</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#090d18">
+  <meta name="description" content="10명의 아이가 쓴 50편의 동시를 직접 걸으며 감상하는 3D 파노라마 전시">
+  <title>별빛 동시 정원 — 3D 전시장</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <a class="skip-link" href="#gallery">전시 바로가기</a>
-  <div class="noise" aria-hidden="true"></div>
+  <a class="skip" href="#index-panel">3D 전시를 건너뛰고 작품 목록 보기</a>
+  <canvas id="gallery-canvas" aria-label="마우스나 손가락으로 둘러보고 이동하는 3D 동시 전시장"></canvas>
+  <div id="loading" class="loading"><span></span><p>전시장을 준비하고 있어요</p></div>
 
-  <section id="welcome" class="welcome" aria-labelledby="welcome-title">
-    <div class="welcome-stars" aria-hidden="true"></div>
-    <p class="eyebrow">어린이 동시 온라인 전시</p>
-    <h1 id="welcome-title"><span>별빛</span> 동시 정원</h1>
-    <p class="welcome-copy">열 명의 아이가 마음속에서 길어 올린<br>쉰 편의 작은 우주를 만나보세요.</p>
-    <button id="enter-button" class="primary-button" type="button">정원으로 들어가기 <span aria-hidden="true">→</span></button>
-    <p class="welcome-note">로그인 없이 바로 입장 · 모바일과 PC 지원</p>
+  <section id="intro" class="intro" aria-labelledby="intro-title">
+    <div class="intro-orbit" aria-hidden="true"><i></i><i></i><i></i></div>
+    <p class="kicker">어린이 동시 온라인 전시</p>
+    <h1 id="intro-title"><em>별빛</em><br>동시 정원</h1>
+    <p>열 명의 작은 시인이 쓴 쉰 편의 동시를<br>360° 전시 공간에서 천천히 만나보세요.</p>
+    <button id="enter" type="button">3D 전시장 입장 <span>→</span></button>
+    <div class="intro-meta"><span>로그인 없이 입장</span><span>PC · 모바일 지원</span></div>
   </section>
 
-  <main id="gallery" class="gallery" hidden>
+  <main id="hud" class="hud" hidden>
     <header class="topbar">
-      <button id="home-button" class="brand" type="button" aria-label="처음 화면으로">
-        <span class="brand-mark" aria-hidden="true">✦</span>
-        <span>별빛 동시 정원</span>
-      </button>
-      <div class="progress-wrap" aria-label="관람한 어린이 수">
-        <span id="progress-text">0 / 10 별을 만났어요</span>
-        <div class="progress-track"><span id="progress-bar"></span></div>
-      </div>
-      <button id="list-button" class="round-button" type="button" aria-label="작품 목록 열기">☰</button>
+      <button id="home" class="logo" type="button" aria-label="입구로 돌아가기"><b>✦</b><span>별빛 동시 정원</span></button>
+      <div class="zone-label"><small>현재 구역</small><strong id="zone-name">중앙 홀</strong></div>
+      <button id="index-open" class="icon-button" type="button" aria-label="전체 작품 목록">☰</button>
     </header>
-
-    <section class="scene-shell" aria-label="3D 동시 전시 공간">
-      <div id="scene" class="scene">
-        <div class="sky-glow glow-one" aria-hidden="true"></div>
-        <div class="sky-glow glow-two" aria-hidden="true"></div>
-        <div id="star-field" class="star-field" aria-hidden="true"></div>
-        <div class="world" id="world">
-          <div class="horizon" aria-hidden="true"></div>
-          <div class="garden-ring" aria-hidden="true"></div>
-          <div id="child-stars" class="child-stars"></div>
-          <div class="center-sign" aria-hidden="true">
-            <span>✦</span>
-            <strong>별을 눌러<br>동시를 만나보세요</strong>
-          </div>
-        </div>
-      </div>
-
-      <div class="scene-guide">
-        <button id="prev-star" type="button" aria-label="이전 별">←</button>
-        <p><strong id="guide-name">별을 선택해 보세요</strong><span id="guide-index">천천히 둘러봐도 좋아요</span></p>
-        <button id="next-star" type="button" aria-label="다음 별">→</button>
-      </div>
-    </section>
-
-    <aside id="poem-panel" class="poem-panel" aria-hidden="true" aria-labelledby="panel-child-name">
-      <div class="panel-backdrop" data-close-panel></div>
-      <article class="panel-card">
-        <button class="panel-close" type="button" data-close-panel aria-label="작품 창 닫기">×</button>
-        <div class="child-heading">
-          <div id="panel-avatar" class="panel-avatar" aria-hidden="true"></div>
-          <div><p>작은 시인</p><h2 id="panel-child-name"></h2></div>
-        </div>
-        <div id="poem-tabs" class="poem-tabs" role="tablist" aria-label="동시 선택"></div>
-        <div class="poem-sheet">
-          <p id="placeholder-label" class="placeholder-label">교체용 예시 문구</p>
-          <h3 id="poem-title"></h3>
-          <p id="poem-body" class="poem-body"></p>
-          <p id="poem-count" class="poem-count"></p>
-        </div>
-        <div class="panel-nav">
-          <button id="prev-poem" type="button">← 이전 동시</button>
-          <button id="next-poem" type="button">다음 동시 →</button>
-        </div>
-      </article>
+    <div id="crosshair" class="crosshair" aria-hidden="true"></div>
+    <p id="focus-hint" class="focus-hint">이 작품을 눌러 감상하기</p>
+    <aside class="mini-map" aria-label="전시장 미니맵">
+      <div id="map-dot" class="map-dot"></div><div id="map-view" class="map-view"></div>
+      <span class="map-center">✦</span><i class="map-ring"></i>
     </aside>
-
-    <aside id="list-panel" class="list-panel" aria-hidden="true" aria-labelledby="list-title">
-      <div class="list-head"><div><p>전체 작품</p><h2 id="list-title">50개의 작은 우주</h2></div><button id="list-close" type="button" aria-label="목록 닫기">×</button></div>
-      <div id="child-list" class="child-list"></div>
-      <p class="content-note">현재 이름·제목·본문은 실제 작품을 넣기 전의 교체용 문구입니다.</p>
-    </aside>
-
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div class="desktop-help"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>이동</span><i></i><span>드래그하여 둘러보기</span></div>
+    <div class="mobile-controls" aria-label="이동 조작">
+      <div id="joystick" class="joystick"><span id="joystick-knob"></span></div>
+      <div class="look-help">화면을 밀어<br>둘러보기</div>
+    </div>
   </main>
 
-  <script src="app.js"></script>
+  <section id="poem-modal" class="poem-modal" aria-hidden="true" aria-labelledby="poem-title">
+    <div class="modal-shade" data-close></div>
+    <article class="poem-card">
+      <button class="modal-close" type="button" data-close aria-label="작품 닫기">×</button>
+      <div class="poem-meta"><span id="poem-dot"></span><p>작은 시인<br><strong id="poem-child"></strong></p><em id="poem-number"></em></div>
+      <div class="placeholder-badge">실제 작품 교체 전 예시 문구</div>
+      <h2 id="poem-title"></h2>
+      <p id="poem-body"></p>
+      <footer><button id="prev-poem" type="button">← 이전 작품</button><button id="next-poem" type="button">다음 작품 →</button></footer>
+    </article>
+  </section>
+
+  <aside id="index-panel" class="index-panel" aria-hidden="true" aria-labelledby="index-title">
+    <header><div><small>전체 작품</small><h2 id="index-title">50개의 작은 우주</h2></div><button id="index-close" type="button" aria-label="목록 닫기">×</button></header>
+    <div id="index-list" class="index-list"></div>
+    <p class="data-note">현재 이름·제목·본문은 실제 작품을 넣기 전의 교체용 문구입니다.</p>
+  </aside>
+  <div id="rotate-note" class="rotate-note">가로로 돌리면 전시장을 더 넓게 볼 수 있어요</div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
