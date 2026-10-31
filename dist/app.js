@@ -25,6 +25,7 @@ const ZONE_LAYOUT=[
   {x:15,z:-7.5,ry:-Math.PI/2},{x:15,z:0,ry:-Math.PI/2},{x:15,z:7.5,ry:-Math.PI/2}
 ];
 const visited=new Set(JSON.parse(localStorage.getItem('galleryVisited')||'[]'));
+const poemPngTextures=new Map();
 
 function init(){
   THREE.Cache.enabled=true;
@@ -83,7 +84,7 @@ function buildZone(ci){
   c.poems.forEach((p,pi)=>{
     const framedArt=new THREE.Group();framedArt.position.set((pi-2)*1.4,2.55,.22);
     const frameBody=new THREE.Mesh(new THREE.BoxGeometry(1.06,1.62,.16),scene.userData.frameSideMaterial);frameBody.castShadow=renderer.shadowMap.enabled;framedArt.add(frameBody);
-    const art=new THREE.Mesh(new THREE.PlaneGeometry(.88,1.36),new THREE.MeshStandardMaterial({map:makePoemTexture(ci,pi),roughness:.48,emissive:new THREE.Color(c.color),emissiveIntensity:.045,side:THREE.DoubleSide}));art.position.z=.086;art.userData={type:'poem',child:ci,poem:pi};frameMeshes.push(art);framedArt.add(art);
+    const art=new THREE.Mesh(new THREE.PlaneGeometry(.88,1.36),new THREE.MeshStandardMaterial({map:makePoemPngTexture(ci,pi),roughness:.48,emissive:new THREE.Color(c.color),emissiveIntensity:.045,side:THREE.DoubleSide}));art.position.z=.086;art.userData={type:'poem',child:ci,poem:pi};frameMeshes.push(art);framedArt.add(art);
     const frame=new THREE.Mesh(new THREE.PlaneGeometry(1.08,1.64),new THREE.MeshBasicMaterial({map:scene.userData.frameTexture,transparent:true,alphaTest:.035,depthWrite:false,toneMapped:true,side:THREE.DoubleSide}));frame.position.z=.098;frame.renderOrder=2;framedArt.add(frame);zone.add(framedArt);
   });
   const glowPos=zoneLocalToWorld(layout,0,2.2);const zoneGlow=new THREE.PointLight(c.color,.38,6,2);zoneGlow.position.set(glowPos.x,3.6,glowPos.z);scene.add(zoneGlow);
@@ -97,7 +98,8 @@ function makeTextTexture(title,sub,color,w,h){
   x.fillStyle='#6a513d';x.font='28px Gowun Dodum, sans-serif';x.fillText(sub,w/2,164);
   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;
 }
-function makePoemTexture(ci,pi){
+function makePoemPngTexture(ci,pi){
+  const key=`${ci}-${pi}`;if(poemPngTextures.has(key))return poemPngTextures.get(key);
   const c=document.createElement('canvas');c.width=384;c.height=510;const x=c.getContext('2d'),d=children[ci],p=d.poems[pi];x.scale(.6,.6);
   x.fillStyle='#fffaf0';x.fillRect(0,0,640,850);x.fillStyle=d.color;x.fillRect(0,0,640,28);
   x.fillStyle='#777f91';x.font='24px Gowun Dodum, sans-serif';x.fillText(d.name,54,92);
@@ -108,7 +110,7 @@ function makePoemTexture(ci,pi){
   x.fillStyle='#a9a190';x.font='22px Gowun Dodum, sans-serif';x.fillText(`${pi+1} / 5`,54,790);
   const bead=x.createRadialGradient(558,768,4,566,776,24);bead.addColorStop(0,'#fff8');bead.addColorStop(.34,d.color);bead.addColorStop(1,'#8f694d');
   x.fillStyle=bead;x.beginPath();x.arc(566,776,22,0,Math.PI*2);x.fill();x.strokeStyle='#ffffffaa';x.lineWidth=3;x.stroke();
-  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),coarsePointer?2:4);return t;
+  const png=c.toDataURL('image/png'),t=new THREE.TextureLoader().load(png);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),coarsePointer?2:4);t.userData={format:'image/png',source:'framed-poem-png'};poemPngTextures.set(key,t);return t;
 }
 function buildPlant(x,z){
   makePngSprite('assets/planter-png.png',1.12,1.42,[x,.69,z]);makeContactShadow(x,z,.8,.34,.19);
