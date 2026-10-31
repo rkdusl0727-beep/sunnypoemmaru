@@ -10,7 +10,7 @@ let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,dragMode=null,
 let tourActive=false,tourElapsed=0,entryActive=false,entryElapsed=0,hasDestination=false,zoneTravelActive=false,zoneTravelElapsed=0;
 let destinationTurnsView=true;
 let audioContext,audioMaster,musicTimer,musicStep=0,musicOn=true;
-let guideUtterance=null,contactShadowTexture=null;
+let guideUtterance=null,guideAudioBufferPromise=null,guideAudioSource=null,guideAudioPending=false,contactShadowTexture=null;
 const coarsePointer=matchMedia('(pointer:coarse)').matches||innerWidth<800,reduceMotion=matchMedia('(prefers-reduced-motion:reduce)').matches,moveVelocity=new THREE.Vector3(),moveTarget=new THREE.Vector3(),moveDestination=new THREE.Vector3(),curatorTarget=new THREE.Vector3(),clickPoint=new THREE.Vector2();
 const cameraPos=new THREE.Vector3(0,1.65,11.2);
 const zoneTravelStart=new THREE.Vector3(),zoneTravelEnd=new THREE.Vector3();
@@ -220,7 +220,7 @@ function updateCurator(dt,now){
 
 function startAmbientMusic(){
   if(!audioContext){audioContext=new (window.AudioContext||window.webkitAudioContext)();audioMaster=audioContext.createGain();const filter=audioContext.createBiquadFilter();filter.type='lowpass';filter.frequency.value=1800;audioMaster.gain.value=.0001;audioMaster.connect(filter).connect(audioContext.destination)}
-  audioContext.resume();musicOn=true;audioMaster.gain.cancelScheduledValues(audioContext.currentTime);audioMaster.gain.exponentialRampToValueAtTime(.055,audioContext.currentTime+1.8);playAmbientChord();clearInterval(musicTimer);musicTimer=setInterval(playAmbientChord,4800);updateMusicButton();
+  audioContext.resume();prepareGuideAudio();musicOn=true;audioMaster.gain.cancelScheduledValues(audioContext.currentTime);audioMaster.gain.exponentialRampToValueAtTime(.055,audioContext.currentTime+1.8);playAmbientChord();clearInterval(musicTimer);musicTimer=setInterval(playAmbientChord,4800);updateMusicButton();
 }
 function stopAmbientMusic(){
   musicOn=false;clearInterval(musicTimer);if(audioContext&&audioMaster){audioMaster.gain.cancelScheduledValues(audioContext.currentTime);audioMaster.gain.exponentialRampToValueAtTime(.0001,audioContext.currentTime+1.2)}updateMusicButton();
@@ -271,7 +271,7 @@ function startPanoramaTour(){
 function updatePanoramaTour(dt){
   tourElapsed=Math.min(TOUR_DURATION,tourElapsed+dt);const t=tourElapsed/TOUR_DURATION,e=t*t*(3-2*t),angle=e*Math.PI*2;camera.position.set(Math.sin(angle)*9.1,2.08,Math.cos(angle)*8.2);const dx=-camera.position.x,dz=-camera.position.z;yaw=Math.atan2(-dx,-dz);pitch=-.03;camera.rotation.set(pitch,yaw,0);if(t>=1)finishPanoramaTour()
 }
-function finishPanoramaTour(){tourActive=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,9.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구'}
+function finishPanoramaTour(){tourActive=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,9.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구';setTimeout(()=>{if(started&&!entryActive&&!tourActive)speakCurator()},500)}
 function dampAngle(a,b,t){let d=(b-a+Math.PI)%(Math.PI*2)-Math.PI;if(d<-Math.PI)d+=Math.PI*2;return a+d*t}
 function showOverview(){tourActive=false;entryActive=false;zoneTravelActive=false;hasDestination=false;scene.userData.clickMarker.visible=false;overviewMode=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,9.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구'}
 function goToChildZone(ci){
@@ -301,15 +301,21 @@ function openSettings(){if(!adminMode)return;closeIndex();closePoem();modalOpen=
 function closeSettings(){if(!adminMode)return;modalOpen=false;$('#settings-panel').classList.remove('open');$('#settings-panel').setAttribute('aria-hidden','true')}
 function getNaturalKoreanVoice(){
   if(!('speechSynthesis' in window))return null;const voices=speechSynthesis.getVoices(),korean=voices.filter(v=>/^ko([-_]|$)/i.test(v.lang));
-  return korean.find(v=>/natural|premium|enhanced|yuna|sunhi|sora|heami|google/i.test(v.name))||null
+  return korean.find(v=>/natural|premium|enhanced|yuna|sunhi|sora|heami|google|microsoft/i.test(v.name))||korean[0]||null
 }
-function speakCurator(){
-  if(!('speechSynthesis' in window)||guideUtterance||speechSynthesis.speaking)return;const voice=getNaturalKoreanVoice();if(!voice)return;
+function speakCurator(attempt=0){
+  if(guideAudioSource||guideUtterance||guideAudioPending)return;if(audioContext){guideAudioPending=true;prepareGuideAudio().then(buffer=>{guideAudioPending=false;if(!started||entryActive||tourActive)return;moveVelocity.set(0,0,0);hasDestination=false;scene.userData.clickMarker.visible=false;guideAudioSource=audioContext.createBufferSource();const gain=audioContext.createGain();guideAudioSource.buffer=buffer;gain.gain.value=.9;guideAudioSource.connect(gain).connect(audioContext.destination);if(audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.012,audioContext.currentTime+.35);guideAudioSource.onended=()=>{guideAudioSource=null;if(audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.055,audioContext.currentTime+.8)};audioContext.resume();guideAudioSource.start()}).catch(()=>{guideAudioPending=false;speakBrowserVoice(attempt)});return}speakBrowserVoice(attempt)
+}
+function prepareGuideAudio(){
+  if(!guideAudioBufferPromise&&audioContext)guideAudioBufferPromise=fetch('assets/curator-guide.wav').then(response=>{if(!response.ok)throw new Error('guide audio unavailable');return response.arrayBuffer()}).then(data=>audioContext.decodeAudioData(data));return guideAudioBufferPromise
+}
+function speakBrowserVoice(attempt=0){
+  if(!('speechSynthesis' in window)||guideUtterance||speechSynthesis.speaking)return;const voice=getNaturalKoreanVoice();if(!voice){if(attempt<8)setTimeout(()=>{if(started&&!entryActive&&!tourActive)speakBrowserVoice(attempt+1)},250);return}
   moveVelocity.set(0,0,0);hasDestination=false;scene.userData.clickMarker.visible=false;
-  const line='반가워요. 이곳에는 어린이 작가들의 소중한 작품이 전시되어 있어요. 천천히 걸으며 마음에 드는 작품을 눌러 감상해 보세요.';
-  guideUtterance=new SpeechSynthesisUtterance(line);guideUtterance.voice=voice;guideUtterance.lang='ko-KR';guideUtterance.rate=.88;guideUtterance.pitch=.96;guideUtterance.volume=.82;if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.018,audioContext.currentTime+.35);const finish=()=>{guideUtterance=null;if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.055,audioContext.currentTime+.8)};guideUtterance.onend=finish;guideUtterance.onerror=finish;speechSynthesis.speak(guideUtterance)
+  const line='안녕하세요. 저는 전시 안내를 맡은 마루예요. 바닥을 클릭하면 원하는 곳으로 이동할 수 있어요. 화면을 가로로 드래그하면 주변을 둘러볼 수 있고, 마우스 휠이나 세로 드래그로 앞뒤로 움직일 수 있어요. 원목 액자를 누르면 아이들의 동시 원본을 감상할 수 있어요. 천천히 둘러보세요.';
+  guideUtterance=new SpeechSynthesisUtterance(line);guideUtterance.voice=voice;guideUtterance.lang='ko-KR';guideUtterance.rate=.86;guideUtterance.pitch=.98;guideUtterance.volume=.86;if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.014,audioContext.currentTime+.35);const finish=()=>{guideUtterance=null;if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.055,audioContext.currentTime+.8)};guideUtterance.onend=finish;guideUtterance.onerror=finish;speechSynthesis.speak(guideUtterance)
 }
-function stopGuideVoice(){if('speechSynthesis' in window)speechSynthesis.cancel();guideUtterance=null;if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.055,audioContext.currentTime+.4)}
+function stopGuideVoice(){if('speechSynthesis' in window)speechSynthesis.cancel();guideUtterance=null;guideAudioPending=false;if(guideAudioSource){const source=guideAudioSource;guideAudioSource=null;try{source.stop()}catch{}}if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.055,audioContext.currentTime+.4)}
 function showPoemScan(ci,pi){
   const record=scanRecords.get(`${ci}-${pi}`),scan=$('#poem-scan'),empty=$('#poem-scan-empty');if(activeScanUrl){URL.revokeObjectURL(activeScanUrl);activeScanUrl=null}
   if(!record){scan.hidden=true;scan.removeAttribute('src');empty.hidden=false;return}
