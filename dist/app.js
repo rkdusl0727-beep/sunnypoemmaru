@@ -11,8 +11,8 @@ const visited=new Set(JSON.parse(localStorage.getItem('galleryVisited')||'[]'));
 
 function init(){
   scene=new THREE.Scene();
-  scene.background=new THREE.Color(0xf0dfc5);
-  scene.fog=new THREE.FogExp2(0xf0dfc5,.012);
+  scene.background=new THREE.Color(0xf8eedf);
+  scene.fog=new THREE.FogExp2(0xf8eedf,.009);
   camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,.08,100);
   camera.position.copy(cameraPos);camera.rotation.order='YXZ';
   renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
@@ -25,9 +25,10 @@ function init(){
 }
 
 function buildGallery(){
+  scene.userData.cottonTexture=makeCottonTexture();
   scene.add(new THREE.HemisphereLight(0xfff5dc,0xa66f45,2.6));
-  scene.add(new THREE.AmbientLight(0xffe8c4,.72));
-  const floor=new THREE.Mesh(new THREE.CircleGeometry(15.2,96),new THREE.MeshStandardMaterial({color:0xb77a48,roughness:.86,metalness:.02}));
+  scene.add(new THREE.AmbientLight(0xfff0d5,1.05));
+  const floor=new THREE.Mesh(new THREE.CircleGeometry(15.2,96),new THREE.MeshStandardMaterial({color:0xc79768,roughness:.9,metalness:.01}));
   floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
   for(let r=2;r<15;r+=2){
     const ring=new THREE.Mesh(new THREE.RingGeometry(r-.025,r+.025,96),new THREE.MeshBasicMaterial({color:0x714626,transparent:true,opacity:.3,side:THREE.DoubleSide}));
@@ -35,15 +36,32 @@ function buildGallery(){
   }
   const ceiling=new THREE.Mesh(new THREE.RingGeometry(9.2,15.3,96),new THREE.MeshStandardMaterial({color:0xfff4df,roughness:.92,side:THREE.DoubleSide}));
   ceiling.rotation.x=Math.PI/2;ceiling.position.y=5.7;scene.add(ceiling);
+  const canopy=new THREE.Mesh(new THREE.RingGeometry(6.4,9.25,96),new THREE.MeshStandardMaterial({map:scene.userData.cottonTexture,color:0xfffbf3,transparent:true,opacity:.62,roughness:1,side:THREE.DoubleSide,depthWrite:false}));
+  canopy.rotation.x=Math.PI/2;canopy.position.y=5.68;scene.add(canopy);
   for(let i=0;i<10;i++){
     const a=i/10*Math.PI*2;
     const panel=new THREE.Mesh(new THREE.BoxGeometry(8.2,5,.28),new THREE.MeshStandardMaterial({color:0xf1dfc3,roughness:.9}));placeOnRing(panel,a,15.02,2.55);panel.receiveShadow=true;scene.add(panel);
     const wood=new THREE.Mesh(new THREE.BoxGeometry(8.22,1.02,.32),new THREE.MeshStandardMaterial({color:0x9b6840,roughness:.85}));placeOnRing(wood,a,14.98,.53);scene.add(wood);
+    buildCottonCurtain(a+Math.PI/10);
   }
   const sun=new THREE.DirectionalLight(0xffcb88,3.2);sun.position.set(-8,12,5);sun.target.position.set(2,0,-2);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-18;sun.shadow.camera.right=18;sun.shadow.camera.top=18;sun.shadow.camera.bottom=-18;scene.add(sun,sun.target);
   const sunPatch=new THREE.Mesh(new THREE.CircleGeometry(5.4,48),new THREE.MeshBasicMaterial({color:0xffd699,transparent:true,opacity:.18,depthWrite:false}));sunPatch.rotation.x=-Math.PI/2;sunPatch.position.set(-3,.025,2);scene.add(sunPatch);
+  const sunSpot=new THREE.SpotLight(0xffd29a,9,26,Math.PI/5,.92,1);sunSpot.position.set(-7,11,6);sunSpot.target.position.set(1,0,-1);sunSpot.castShadow=true;scene.add(sunSpot,sunSpot.target);
+  for(let i=0;i<4;i++){const stripe=new THREE.Mesh(new THREE.PlaneGeometry(.72,10),new THREE.MeshBasicMaterial({color:0xffdfad,transparent:true,opacity:.1,depthWrite:false,side:THREE.DoubleSide}));stripe.rotation.x=-Math.PI/2;stripe.rotation.z=-.58;stripe.position.set(-5+i*1.25,.035,1+i*.35);scene.add(stripe)}
   for(let i=0;i<10;i++)buildZone(i);
   buildCenterSculpture();buildCurator();buildWarmLights();buildCozyDetails();
+}
+
+function makeCottonTexture(){
+  const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');x.fillStyle='#fffaf0';x.fillRect(0,0,256,256);
+  x.globalAlpha=.14;x.strokeStyle='#bfae96';x.lineWidth=1;for(let i=0;i<256;i+=5){x.beginPath();x.moveTo(i,0);x.lineTo(i+8,256);x.stroke();x.beginPath();x.moveTo(0,i);x.lineTo(256,i+5);x.stroke()}
+  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(3,3);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+function buildCottonCurtain(angle){
+  const geo=new THREE.PlaneGeometry(1.18,4.55,8,18),pos=geo.attributes.position;
+  for(let i=0;i<pos.count;i++){const x=pos.getX(i),y=pos.getY(i);pos.setZ(i,Math.sin(x*11+y*1.2)*.055)}pos.needsUpdate=true;geo.computeVertexNormals();
+  const curtain=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({map:scene.userData.cottonTexture,color:0xfffdf6,transparent:true,opacity:.72,roughness:1,side:THREE.DoubleSide,depthWrite:false}));
+  placeOnRing(curtain,angle,14.84,3);scene.add(curtain);
 }
 
 function buildZone(ci){
@@ -86,7 +104,7 @@ function makePoemTexture(ci,pi){
 }
 function buildCenterSculpture(){
   const g=new THREE.Group();
-  const rug=new THREE.Mesh(new THREE.CylinderGeometry(3.3,3.3,.055,64),new THREE.MeshStandardMaterial({color:0xd89a73,roughness:1}));rug.position.y=.04;g.add(rug);
+  const rug=new THREE.Mesh(new THREE.CylinderGeometry(3.3,3.3,.055,64),new THREE.MeshStandardMaterial({map:scene.userData.cottonTexture,color:0xf0d7ba,roughness:1}));rug.position.y=.04;g.add(rug);
   const bench=new THREE.Mesh(new THREE.TorusGeometry(2.15,.34,18,80),new THREE.MeshStandardMaterial({color:0xb87843,roughness:.8}));bench.rotation.x=Math.PI/2;bench.position.y=.48;bench.castShadow=true;g.add(bench);
   const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.3,.47,3.5,14),new THREE.MeshStandardMaterial({color:0x805332,roughness:.95}));trunk.position.y=2.15;trunk.castShadow=true;g.add(trunk);
   const leafMat=new THREE.MeshStandardMaterial({color:0x91ad71,roughness:.9});
@@ -122,7 +140,7 @@ function buildCozyDetails(){
   const pastel=[0xf4b8a6,0xa9d7c7,0xf2cf7b,0xbcb1dc,0x9ec7df,0xd9a7c2];
   for(let i=0;i<8;i++){
     const a=i/8*Math.PI*2+.2,r=3.25+(i%2)*.65;
-    const cushion=new THREE.Mesh(new THREE.CylinderGeometry(.48,.54,.18,24),new THREE.MeshStandardMaterial({color:pastel[i%pastel.length],roughness:1}));
+    const cushion=new THREE.Mesh(new THREE.CylinderGeometry(.48,.54,.18,24),new THREE.MeshStandardMaterial({map:scene.userData.cottonTexture,color:pastel[i%pastel.length],roughness:1}));
     cushion.position.set(Math.sin(a)*r,.13,Math.cos(a)*r);cushion.scale.z=.78;cushion.rotation.y=-a;cushion.castShadow=true;scene.add(cushion);
   }
   const cordMat=new THREE.MeshBasicMaterial({color:0x8b6548});
