@@ -6,6 +6,7 @@ const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const canvas=$('#gallery-canvas');
 let scene,camera,renderer,clock,raycaster,frameMeshes=[],yaw=0,pitch=0,started=false,modalOpen=false,overviewMode=false;
 let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,lastX=0,lastY=0,keys={},joy={x:0,y:0};
+let audioContext,audioMaster,musicTimer,musicStep=0,musicOn=true;
 const cameraPos=new THREE.Vector3(0,1.65,5.3);
 const visited=new Set(JSON.parse(localStorage.getItem('galleryVisited')||'[]'));
 
@@ -26,6 +27,8 @@ function init(){
 
 function buildGallery(){
   scene.userData.cottonTexture=makeCottonTexture();
+  scene.userData.woodTexture=makeWoodTexture();
+  scene.userData.curtainTexture=new THREE.TextureLoader().load('assets/breeze-curtains.png');scene.userData.curtainTexture.colorSpace=THREE.SRGBColorSpace;
   scene.add(new THREE.HemisphereLight(0xfff5dc,0xa66f45,2.6));
   scene.add(new THREE.AmbientLight(0xfff0d5,1.05));
   const floor=new THREE.Mesh(new THREE.CircleGeometry(15.2,96),new THREE.MeshStandardMaterial({color:0xc79768,roughness:.9,metalness:.01}));
@@ -57,11 +60,15 @@ function makeCottonTexture(){
   x.globalAlpha=.14;x.strokeStyle='#bfae96';x.lineWidth=1;for(let i=0;i<256;i+=5){x.beginPath();x.moveTo(i,0);x.lineTo(i+8,256);x.stroke();x.beginPath();x.moveTo(0,i);x.lineTo(256,i+5);x.stroke()}
   const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(3,3);t.colorSpace=THREE.SRGBColorSpace;return t;
 }
+function makeWoodTexture(){
+  const c=document.createElement('canvas');c.width=512;c.height=256;const x=c.getContext('2d'),g=x.createLinearGradient(0,0,0,256);g.addColorStop(0,'#e0b17b');g.addColorStop(.5,'#bc7d49');g.addColorStop(1,'#d79c63');x.fillStyle=g;x.fillRect(0,0,512,256);
+  x.globalAlpha=.26;x.strokeStyle='#6f3e20';for(let i=0;i<46;i++){const y=i*6+Math.sin(i*.9)*5;x.beginPath();x.moveTo(0,y);for(let px=0;px<=512;px+=32)x.lineTo(px,y+Math.sin(px*.035+i)*3);x.stroke()}x.globalAlpha=1;
+  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(2,1);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
 function buildCottonCurtain(angle){
-  const geo=new THREE.PlaneGeometry(1.18,4.55,8,18),pos=geo.attributes.position;
-  for(let i=0;i<pos.count;i++){const x=pos.getX(i),y=pos.getY(i);pos.setZ(i,Math.sin(x*11+y*1.2)*.055)}pos.needsUpdate=true;geo.computeVertexNormals();
-  const curtain=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({map:scene.userData.cottonTexture,color:0xfffdf6,transparent:true,opacity:.72,roughness:1,side:THREE.DoubleSide,depthWrite:false}));
-  placeOnRing(curtain,angle,14.84,3);scene.add(curtain);
+  const geo=new THREE.PlaneGeometry(4.6,3.45,12,10),pos=geo.attributes.position;geo.userData.base=Float32Array.from(pos.array);
+  const curtain=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({map:scene.userData.curtainTexture,transparent:true,alphaTest:.035,side:THREE.DoubleSide,depthWrite:false,toneMapped:true}));
+  placeOnRing(curtain,angle,14.72,3.55);curtain.renderOrder=2;curtain.userData.phase=angle*2;scene.add(curtain);(scene.userData.curtains??=[]).push(curtain);
 }
 
 function buildZone(ci){
@@ -72,7 +79,8 @@ function buildZone(ci){
   placeOnRing(accent,base,14.72,3.84);scene.add(accent);
   c.poems.forEach((p,pi)=>{
     const angle=base+THREE.MathUtils.degToRad((pi-2)*5.7);
-    const frame=new THREE.Mesh(new THREE.BoxGeometry(1.48,1.92,.13),new THREE.MeshStandardMaterial({color:0x8b5b35,roughness:.72,metalness:.02}));
+    const frame=new THREE.Group(),woodMat=new THREE.MeshStandardMaterial({map:scene.userData.woodTexture,color:0xd6a06a,roughness:.78,metalness:0});
+    [[1.56,.13,0,.965],[1.56,.13,0,-.965],[.13,1.82,-.715,0],[.13,1.82,.715,0]].forEach(v=>{const rail=new THREE.Mesh(new THREE.BoxGeometry(v[0],v[1],.16),woodMat);rail.position.set(v[2],v[3],0);rail.castShadow=true;frame.add(rail)});
     placeOnRing(frame,angle,14.78,2.55);scene.add(frame);
     const art=new THREE.Mesh(new THREE.PlaneGeometry(1.34,1.78),new THREE.MeshStandardMaterial({map:makePoemTexture(ci,pi),roughness:.48,emissive:new THREE.Color(c.color),emissiveIntensity:.045}));
     placeOnRing(art,angle,14.65,2.55);art.userData={type:'poem',child:ci,poem:pi};frameMeshes.push(art);scene.add(art);
@@ -140,8 +148,9 @@ function bind(){
   canvas.addEventListener('pointerdown',e=>{if(!started||modalOpen)return;dragging=true;dragMoved=false;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId)});
   canvas.addEventListener('pointermove',e=>{if(!dragging||modalOpen)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;if(Math.abs(dx)+Math.abs(dy)>3)dragMoved=true;yaw-=dx*.0042;pitch=Math.max(-.78,Math.min(.72,pitch-dy*.0034));lastX=e.clientX;lastY=e.clientY});
   canvas.addEventListener('pointerup',()=>{if(dragging&&!dragMoved)activateCenter();dragging=false});
-  $('#enter').onclick=()=>{started=true;$('#intro').classList.add('closed');$('#hud').hidden=false;showOverview();showToast('전시장 전체를 한눈에 둘러보세요')};
-  $('#home').onclick=()=>{$('#intro').classList.remove('closed');$('#hud').hidden=true;started=false};
+  $('#enter').onclick=()=>{started=true;$('#intro').classList.add('closed');$('#hud').hidden=false;showOverview();startAmbientMusic();showToast('전시장 전체를 한눈에 둘러보세요')};
+  $('#home').onclick=()=>{$('#intro').classList.remove('closed');$('#hud').hidden=true;started=false;stopAmbientMusic()};
+  $('#music-toggle').onclick=()=>musicOn?stopAmbientMusic():startAmbientMusic();
   $('#overview').onclick=showOverview;$('#index-open').onclick=openIndex;$('#index-close').onclick=closeIndex;
   $('#curator-close').onclick=closeCurator;$('#curator-overview').onclick=()=>{closeCurator();showOverview()};
   $$('[data-close]').forEach(b=>b.onclick=closePoem);
@@ -168,8 +177,22 @@ function animate(){
     if(!overviewMode)camera.position.y=1.65;camera.rotation.set(pitch,yaw,0);updateZone();updateFocus();updateMap();
   }
   const now=performance.now()*.001;(scene.userData.animatedSprites||[]).forEach((sprite,i)=>{sprite.position.y=sprite.userData.baseY+Math.sin(now*1.25+sprite.userData.phase+i*.35)*sprite.userData.floatAmount;sprite.material.rotation=Math.sin(now*.7+sprite.userData.phase)*.008});
+  (scene.userData.curtains||[]).forEach(curtain=>{const p=curtain.geometry.attributes.position,b=curtain.geometry.userData.base;for(let i=0;i<p.count;i++){const ix=i*3,x=b[ix],y=b[ix+1];p.setZ(i,b[ix+2]+Math.sin(now*1.15+curtain.userData.phase+y*1.25+x*.7)*(.045+(1.72-y)*.028));}p.needsUpdate=true;});
   renderer.render(scene,camera);
 }
+
+function startAmbientMusic(){
+  if(!audioContext){audioContext=new (window.AudioContext||window.webkitAudioContext)();audioMaster=audioContext.createGain();const filter=audioContext.createBiquadFilter();filter.type='lowpass';filter.frequency.value=1800;audioMaster.gain.value=.0001;audioMaster.connect(filter).connect(audioContext.destination)}
+  audioContext.resume();musicOn=true;audioMaster.gain.cancelScheduledValues(audioContext.currentTime);audioMaster.gain.exponentialRampToValueAtTime(.055,audioContext.currentTime+1.8);playAmbientChord();clearInterval(musicTimer);musicTimer=setInterval(playAmbientChord,4800);updateMusicButton();
+}
+function stopAmbientMusic(){
+  musicOn=false;clearInterval(musicTimer);if(audioContext&&audioMaster){audioMaster.gain.cancelScheduledValues(audioContext.currentTime);audioMaster.gain.exponentialRampToValueAtTime(.0001,audioContext.currentTime+1.2)}updateMusicButton();
+}
+function playAmbientChord(){
+  if(!musicOn||!audioContext)return;const roots=[196,220,174.61,261.63],root=roots[musicStep++%roots.length],now=audioContext.currentTime;
+  [1,1.25,1.5,2].forEach((ratio,i)=>{const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=i===3?'sine':'triangle';osc.frequency.value=root*ratio;osc.detune.value=(i-1.5)*3;gain.gain.setValueAtTime(.0001,now+i*.08);gain.gain.exponentialRampToValueAtTime(i===3?.045:.028,now+.8+i*.08);gain.gain.exponentialRampToValueAtTime(.0001,now+4.6);osc.connect(gain).connect(audioMaster);osc.start(now+i*.08);osc.stop(now+4.8)});
+}
+function updateMusicButton(){const b=$('#music-toggle');if(!b)return;b.classList.toggle('muted',!musicOn);b.setAttribute('aria-pressed',String(musicOn));b.setAttribute('aria-label',musicOn?'전시 음악 끄기':'전시 음악 켜기')}
 function updateZone(){
   const r=Math.hypot(camera.position.x,camera.position.z);
   if(r<4.2){$('#zone-name').textContent='중앙 햇살 마루';return}
