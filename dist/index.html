@@ -13,7 +13,7 @@
 </head>
 <body>
   <a class="skip" href="#index-panel">3D 전시를 건너뛰고 작품 목록 보기</a>
-  <canvas id="gallery-canvas" aria-label="바닥을 클릭해 이동하고 드래그해 둘러보는 3D 동시 전시장"></canvas>
+  <canvas id="gallery-canvas" aria-label="바닥이나 빈 공간을 클릭해 이동하고 드래그해 둘러보는 3D 동시 전시장"></canvas>
   <div id="loading" class="loading"><span></span><p>포근한 전시방을 준비하고 있어요</p></div>
 
   <section id="intro" class="intro" aria-labelledby="intro-title">
@@ -41,7 +41,7 @@
       <div id="map-dot" class="map-dot"></div><div id="map-view" class="map-view"></div>
       <span class="map-center" aria-hidden="true"></span><i class="map-ring"></i>
     </aside>
-    <div class="desktop-help"><span>바닥 클릭 이동 · 드래그 둘러보기 · 작품 클릭 감상</span><i></i><kbd>WASD</kbd><span>보조 이동</span></div>
+    <div class="desktop-help"><span>바닥·빈 공간 클릭 이동 · 뒤를 보고 클릭하면 뒤로 이동</span><i></i><kbd>WASD</kbd><span>보조 이동</span></div>
     <div class="mobile-controls" aria-label="이동 조작">
       <div id="move-pad" class="move-pad" aria-label="방향 이동 버튼">
         <button class="move-forward" type="button" data-move="forward">앞</button>
@@ -50,7 +50,7 @@
         <button class="move-right" type="button" data-move="right">오른쪽</button>
       </div>
       <div class="move-caption">버튼을 누르고 있으면 이동해요</div>
-      <div class="look-help"><strong>쉬운 이동</strong><br>바닥을 눌러 이동해요</div>
+      <div class="look-help"><strong>쉬운 이동</strong><br>뒤를 본 뒤 빈 곳을 눌러도 이동해요</div>
     </div>
   </main>
 
@@ -60,8 +60,8 @@
       <img class="curator-face" src="assets/curator-maru.png" alt="" aria-hidden="true">
       <p class="curator-role">3D 전시 큐레이터 · 마루</p>
       <h2 id="curator-title">반가워요! 전시를 안내할게요.</h2>
-      <p>이곳에는 열 명의 어린이가 쓴 동시가 다섯 편씩 전시되어 있어요. 바닥을 클릭해 원하는 곳으로 이동하고, 액자 옆으로도 걸어가 입체적인 전시를 살펴보세요.</p>
-      <div class="curator-tips"><span><b>1</b> 바닥을 클릭해 이동하기</span><span><b>2</b> 화면을 드래그해 둘러보기</span><span><b>3</b> 작품을 클릭해 감상하기</span></div>
+      <p>이곳에는 열 명의 어린이가 쓴 동시가 다섯 편씩 전시되어 있어요. 바닥이나 빈 공간을 클릭하면 바라보는 방향으로 이동하고, 액자 앞에서는 편안한 감상 거리가 자동으로 유지돼요.</p>
+      <div class="curator-tips"><span><b>1</b> 바닥·빈 공간을 클릭해 이동하기</span><span><b>2</b> 뒤를 보고 클릭하면 뒤로 이동</span><span><b>3</b> 작품을 클릭해 감상하기</span></div>
       <button id="curator-overview" class="curator-action" type="button">정면 입구에서 둘러보기</button>
     </div>
   </section>

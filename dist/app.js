@@ -12,6 +12,8 @@ const coarsePointer=matchMedia('(pointer:coarse)').matches||innerWidth<800,reduc
 const cameraPos=new THREE.Vector3(0,1.65,11.2);
 const TOUR_DURATION=10;
 const ENTRY_DURATION=3.6;
+const WALK_BOUNDS={minX:-11.55,maxX:11.55,minZ:-9.7,maxZ:10};
+const SAFE_ZONES=[{x:-8.7,z:5.6,r:3.25}];
 const ZONE_LAYOUT=[
   {x:-11.25,z:-13.15,ry:0},{x:-3.75,z:-13.15,ry:0},{x:3.75,z:-13.15,ry:0},{x:11.25,z:-13.15,ry:0},
   {x:-15,z:-7.5,ry:Math.PI/2},{x:-15,z:0,ry:Math.PI/2},{x:-15,z:7.5,ry:Math.PI/2},
@@ -171,10 +173,10 @@ function animate(){
       const forward=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0)-joy.y;
       const side=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0)+joy.x;
       if(forward||side){hasDestination=false;scene.userData.clickMarker.visible=false;moveTarget.set(-Math.sin(yaw)*forward+Math.cos(yaw)*side,0,-Math.cos(yaw)*forward-Math.sin(yaw)*side);if(moveTarget.lengthSq()>1)moveTarget.normalize();moveTarget.multiplyScalar(7.4)}
-      else if(hasDestination){moveTarget.set(moveDestination.x-camera.position.x,0,moveDestination.z-camera.position.z);const distance=moveTarget.length();if(distance<.18){hasDestination=false;scene.userData.clickMarker.visible=false;moveTarget.set(0,0,0)}else{const desiredYaw=Math.atan2(-moveTarget.x,-moveTarget.z);yaw=dampAngle(yaw,desiredYaw,1-Math.exp(-7*dt));moveTarget.normalize().multiplyScalar(Math.min(7.2,Math.max(1.3,distance*2.7)))}}
+      else if(hasDestination){moveTarget.set(moveDestination.x-camera.position.x,0,moveDestination.z-camera.position.z);const distance=moveTarget.length();if(distance<.28){hasDestination=false;scene.userData.clickMarker.visible=false;moveTarget.set(0,0,0)}else{const desiredYaw=Math.atan2(-moveTarget.x,-moveTarget.z);yaw=dampAngle(yaw,desiredYaw,1-Math.exp(-7*dt));moveTarget.normalize().multiplyScalar(Math.min(7.2,Math.max(1.3,distance*2.7)))}}
       else moveTarget.set(0,0,0);
       moveVelocity.lerp(moveTarget,1-Math.exp(-(moveTarget.lengthSq()>.01?11:8)*dt));camera.position.addScaledVector(moveVelocity,dt);
-      camera.position.x=THREE.MathUtils.clamp(camera.position.x,-13.55,13.55);camera.position.z=THREE.MathUtils.clamp(camera.position.z,-11.85,11.85);
+      if(constrainWalkPosition(camera.position))moveVelocity.multiplyScalar(.22);
       camera.position.y=1.65;camera.rotation.set(pitch,yaw,0);updateZone();updateFocus();updateMap();
     }
   }
@@ -219,8 +221,14 @@ function activateCenter(){if(camera.userData.focus){const d=camera.userData.focu
 function handleWorldClick(x,y){
   clickPoint.set(x/innerWidth*2-1,-(y/innerHeight)*2+1);raycaster.setFromCamera(clickPoint,camera);
   const subject=raycaster.intersectObjects(frameMeshes,false)[0];if(subject){const d=subject.object.userData;if(d.type==='curator')openCurator();else openPoem(d.child,d.poem);return}
-  const floorHit=raycaster.intersectObject(scene.userData.floor,false)[0];if(!floorHit)return;
-  moveDestination.copy(floorHit.point);moveDestination.x=THREE.MathUtils.clamp(moveDestination.x,-13.25,13.25);moveDestination.z=THREE.MathUtils.clamp(moveDestination.z,-11.55,11.55);moveDestination.y=0;hasDestination=true;moveVelocity.multiplyScalar(.35);const marker=scene.userData.clickMarker;marker.position.set(moveDestination.x,.045,moveDestination.z);marker.visible=true;showToast('선택한 곳으로 이동할게요')
+  const floorHit=raycaster.intersectObject(scene.userData.floor,false)[0];let usedOpenSpace=false;
+  if(floorHit)moveDestination.copy(floorHit.point);else{const direction=raycaster.ray.direction.clone();direction.y=0;if(direction.lengthSq()<.01)return;direction.normalize();moveDestination.copy(camera.position).addScaledVector(direction,6);usedOpenSpace=true}
+  moveDestination.y=0;const adjusted=constrainWalkPosition(moveDestination);hasDestination=true;moveVelocity.multiplyScalar(.35);const marker=scene.userData.clickMarker;marker.position.set(moveDestination.x,.045,moveDestination.z);marker.visible=true;showToast(adjusted?'작품과 거리를 두고 안전한 곳으로 이동할게요':usedOpenSpace?'바라보는 방향으로 이동할게요':'선택한 곳으로 이동할게요')
+}
+function constrainWalkPosition(position){
+  let adjusted=false,x=THREE.MathUtils.clamp(position.x,WALK_BOUNDS.minX,WALK_BOUNDS.maxX),z=THREE.MathUtils.clamp(position.z,WALK_BOUNDS.minZ,WALK_BOUNDS.maxZ);if(x!==position.x||z!==position.z)adjusted=true;position.x=x;position.z=z;
+  SAFE_ZONES.forEach(zone=>{let dx=position.x-zone.x,dz=position.z-zone.z,dist=Math.hypot(dx,dz);if(dist<zone.r){adjusted=true;if(dist<.001){dx=1;dz=0;dist=1}position.x=zone.x+dx/dist*zone.r;position.z=zone.z+dz/dist*zone.r}});
+  position.x=THREE.MathUtils.clamp(position.x,WALK_BOUNDS.minX,WALK_BOUNDS.maxX);position.z=THREE.MathUtils.clamp(position.z,WALK_BOUNDS.minZ,WALK_BOUNDS.maxZ);return adjusted
 }
 function resetEntrance(){(scene.userData.doors||[]).forEach(door=>door.rotation.y=0);camera.position.set(0,1.65,11.2);yaw=0;pitch=0;camera.rotation.set(0,0,0)}
 function startEntrySequence(){
@@ -235,9 +243,9 @@ function startPanoramaTour(){
 function updatePanoramaTour(dt){
   tourElapsed=Math.min(TOUR_DURATION,tourElapsed+dt);const t=tourElapsed/TOUR_DURATION,e=t*t*(3-2*t),angle=e*Math.PI*2;camera.position.set(Math.sin(angle)*9.1,2.08,Math.cos(angle)*8.2);const dx=-camera.position.x,dz=-camera.position.z;yaw=Math.atan2(-dx,-dz);pitch=-.03;camera.rotation.set(pitch,yaw,0);if(t>=1)finishPanoramaTour()
 }
-function finishPanoramaTour(){tourActive=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,11.2);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구';showToast(coarsePointer?'바닥을 눌러 이동하고 화면을 밀어 둘러보세요':'바닥 클릭 이동 · 드래그 둘러보기 · 작품 클릭 감상')}
+function finishPanoramaTour(){tourActive=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,9.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구';showToast(coarsePointer?'뒤를 본 뒤 빈 곳을 눌러도 이동해요':'바닥·빈 공간 클릭 이동 · 뒤를 보고 클릭하면 뒤로 이동')}
 function dampAngle(a,b,t){let d=(b-a+Math.PI)%(Math.PI*2)-Math.PI;if(d<-Math.PI)d+=Math.PI*2;return a+d*t}
-function showOverview(){tourActive=false;entryActive=false;hasDestination=false;scene.userData.clickMarker.visible=false;overviewMode=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,11.2);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구'}
+function showOverview(){tourActive=false;entryActive=false;hasDestination=false;scene.userData.clickMarker.visible=false;overviewMode=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,9.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구'}
 function updateMap(){const x=camera.position.x/15*40,z=camera.position.z/13.2*40;$('#map-dot').style.transform=`translate(${x}px,${z}px)`;$('#map-view').style.transform=`rotate(${-yaw}rad)`}
 function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,coarsePointer?1:1.25))}
 
