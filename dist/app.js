@@ -106,7 +106,7 @@ function buildZone(ci){
 }
 
 function zoneLocalToWorld(layout,x,z){return new THREE.Vector3(layout.x+Math.cos(layout.ry)*x+Math.sin(layout.ry)*z,0,layout.z-Math.sin(layout.ry)*x+Math.cos(layout.ry)*z)}
-function loadGalleryConfig(){try{const saved=JSON.parse(localStorage.getItem('galleryConfig')||'{}'),frames=saved.frames&&typeof saved.frames==='object'?Object.fromEntries(Object.entries(saved.frames).filter(([key,value])=>/^\d-\d$/.test(key)&&FRAME_PRESETS[value])):{},theme=saved.theme==='white'?'storybook':saved.theme;return{name:typeof saved.name==='string'&&saved.name.trim()?saved.name.trim().slice(0,30):DEFAULT_GALLERY_CONFIG.name,theme:['warm','storybook'].includes(theme)?theme:'warm',frames}}catch{return{name:DEFAULT_GALLERY_CONFIG.name,theme:'warm',frames:{}}}}
+function loadGalleryConfig(){try{const saved=JSON.parse(localStorage.getItem('galleryConfig')||'{}'),frames=saved.frames&&typeof saved.frames==='object'?Object.fromEntries(Object.entries(saved.frames).filter(([key,value])=>/^\d-\d$/.test(key)&&FRAME_PRESETS[value])):{},theme=saved.theme==='white'?'storybook':saved.theme,savedName=typeof saved.name==='string'?saved.name.trim().slice(0,30):'';return{name:savedName&&savedName!=='우리들의 미술관'?savedName:DEFAULT_GALLERY_CONFIG.name,theme:['warm','storybook'].includes(theme)?theme:'warm',frames}}catch{return{name:DEFAULT_GALLERY_CONFIG.name,theme:'warm',frames:{}}}}
 function saveGalleryConfig(){localStorage.setItem('galleryConfig',JSON.stringify(galleryConfig))}
 function applyGalleryName(name,persist=true){
   const clean=(name||DEFAULT_GALLERY_CONFIG.name).trim().slice(0,30)||DEFAULT_GALLERY_CONFIG.name,parts=clean.split(/\s+/),first=parts.shift(),rest=parts.join(' ');galleryConfig.name=clean;
