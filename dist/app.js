@@ -14,7 +14,7 @@ const cameraPos=new THREE.Vector3(0,1.65,11.2);
 const TOUR_DURATION=10;
 const ENTRY_DURATION=3.6;
 const WALK_BOUNDS={minX:-11.55,maxX:11.55,minZ:-9.7,maxZ:10};
-const SAFE_ZONES=[{x:-8.7,z:5.6,r:3.25}];
+const SAFE_ZONES=[{x:0,z:0,r:3.35}];
 const ZONE_LAYOUT=[
   {x:-11.25,z:-13.15,ry:0},{x:-3.75,z:-13.15,ry:0},{x:3.75,z:-13.15,ry:0},{x:11.25,z:-13.15,ry:0},
   {x:-15,z:-7.5,ry:Math.PI/2},{x:-15,z:0,ry:Math.PI/2},{x:-15,z:7.5,ry:Math.PI/2},
@@ -107,8 +107,8 @@ function makePoemTexture(ci,pi){
   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),coarsePointer?2:4);return t;
 }
 function buildCenterSculpture(){
-  const g=makePngSprite('assets/centerpiece-tree.png',6.4,5.85,[-8.7,2.88,5.6],.035);g.material.depthWrite=true;g.material.depthTest=true;g.renderOrder=1;scene.userData.sculpture=g;
-  const light=new THREE.PointLight(0xffc77a,3.4,10,2);light.position.set(-8.7,3.5,5.6);scene.add(light);
+  const g=makePngSprite('assets/centerpiece-tree.png',6.8,6.05,[0,3,0],.025);g.material.depthWrite=true;g.material.depthTest=true;g.renderOrder=1;scene.userData.sculpture=g;
+  const light=new THREE.PointLight(0xffc77a,3.4,11,2);light.position.set(0,3.65,0);scene.add(light);
 }
 function buildPlant(x,z){
   makePngSprite('assets/planter-png.png',1.12,1.42,[x,.71,z],.012,x*.17+z*.11);
