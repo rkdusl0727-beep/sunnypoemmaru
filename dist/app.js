@@ -30,9 +30,10 @@ function init(){
 function buildGallery(){
   scene.userData.cottonTexture=makeCottonTexture();
   scene.userData.frameTexture=new THREE.TextureLoader().load('assets/wood-frame-png.png');scene.userData.frameTexture.colorSpace=THREE.SRGBColorSpace;
+  scene.userData.floorTexture=new THREE.TextureLoader().load('assets/oak-floor-25d.png');scene.userData.floorTexture.colorSpace=THREE.SRGBColorSpace;scene.userData.floorTexture.wrapS=scene.userData.floorTexture.wrapT=THREE.RepeatWrapping;scene.userData.floorTexture.repeat.set(6,6);scene.userData.floorTexture.anisotropy=coarsePointer?2:4;
   scene.add(new THREE.HemisphereLight(0xfff5dc,0xa66f45,2.6));
   scene.add(new THREE.AmbientLight(0xfff0d5,1.05));
-  const floor=new THREE.Mesh(new THREE.CircleGeometry(15.2,96),new THREE.MeshStandardMaterial({color:0xc79768,roughness:.9,metalness:.01}));
+  const floor=new THREE.Mesh(new THREE.CircleGeometry(15.2,96),new THREE.MeshStandardMaterial({map:scene.userData.floorTexture,color:0xffffff,roughness:.88,metalness:0}));
   floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
   for(let r=2;r<15;r+=2){
     const ring=new THREE.Mesh(new THREE.RingGeometry(r-.025,r+.025,96),new THREE.MeshBasicMaterial({color:0x714626,transparent:true,opacity:.3,side:THREE.DoubleSide}));
@@ -105,7 +106,8 @@ function buildPlant(angle,radius){
   makePngSprite('assets/planter-png.png',1.12,1.42,[Math.sin(angle)*radius,.71,Math.cos(angle)*radius],.012,angle);
 }
 function buildCurator(){
-  const g=makePngSprite('assets/curator-maru.png',1.28,1.92,[1.35,.98,6.7],0);g.renderOrder=4;g.userData.type='curator';scene.userData.curator=g;frameMeshes.push(g);
+  const loader=new THREE.TextureLoader(),idle=loader.load('assets/curator-maru.png'),walkA=loader.load('assets/curator-walk-a.png'),walkB=loader.load('assets/curator-walk-b.png');[idle,walkA,walkB].forEach(t=>t.colorSpace=THREE.SRGBColorSpace);
+  const g=new THREE.Sprite(new THREE.SpriteMaterial({map:idle,transparent:true,alphaTest:.04,depthWrite:false}));g.scale.set(1.28,1.92,1);g.position.set(1.35,.98,6.7);g.renderOrder=4;g.userData={type:'curator',textures:{idle,walkA,walkB},currentTexture:idle};scene.add(g);scene.userData.curator=g;frameMeshes.push(g);
 }
 function buildWarmLights(){
   const lamps=new THREE.Group();for(let i=0;i<16;i++){const a=i/16*Math.PI*2;const bulb=new THREE.Mesh(new THREE.SphereGeometry(.08,10,8),new THREE.MeshStandardMaterial({color:0xffe0a0,emissive:0xe59d3f,emissiveIntensity:1.5}));bulb.position.set(Math.sin(a)*8.5,5.48,Math.cos(a)*8.5);lamps.add(bulb)}scene.add(lamps);
@@ -161,7 +163,10 @@ function animate(){
 function updateCurator(dt,now){
   const curator=scene.userData.curator;if(!curator||!started)return;
   curatorTarget.set(camera.position.x-Math.sin(yaw)*2.25+Math.cos(yaw)*1.25,1.02+Math.sin(now*2)*.035,camera.position.z-Math.cos(yaw)*2.25-Math.sin(yaw)*1.25);
-  const r=Math.hypot(curatorTarget.x,curatorTarget.z);if(r>12.1){curatorTarget.x*=12.1/r;curatorTarget.z*=12.1/r}curator.position.lerp(curatorTarget,1-Math.exp(-6.5*dt));
+  const r=Math.hypot(curatorTarget.x,curatorTarget.z);if(r>12.1){curatorTarget.x*=12.1/r;curatorTarget.z*=12.1/r}
+  const walking=moveVelocity.lengthSq()>.16||curator.position.distanceToSquared(curatorTarget)>.018,tex=walking?(Math.floor(now*5.5)%2?curator.userData.textures.walkA:curator.userData.textures.walkB):curator.userData.textures.idle;
+  if(curator.userData.currentTexture!==tex){curator.material.map=tex;curator.material.needsUpdate=true;curator.userData.currentTexture=tex}curator.material.rotation=walking?Math.sin(now*11)*.018:Math.sin(now*1.4)*.006;
+  curatorTarget.y=walking?1.02+Math.abs(Math.sin(now*11))*.045:1.02+Math.sin(now*1.8)*.018;curator.position.lerp(curatorTarget,1-Math.exp(-6.5*dt));
 }
 
 function startAmbientMusic(){
