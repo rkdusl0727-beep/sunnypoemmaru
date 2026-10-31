@@ -300,7 +300,7 @@ function getNaturalKoreanVoice(){
 function speakCurator(){
   if(!('speechSynthesis' in window)||guideUtterance||speechSynthesis.speaking)return;const voice=getNaturalKoreanVoice();if(!voice)return;
   moveVelocity.set(0,0,0);hasDestination=false;scene.userData.clickMarker.visible=false;
-  const line='반가워요. 이곳에는 열 명의 어린이 작가가 만든 작품 쉰 점이 전시되어 있어요. 천천히 걸으며 마음에 드는 작품을 눌러 감상해 보세요.';
+  const line='반가워요. 이곳에는 어린이 작가들의 소중한 작품이 전시되어 있어요. 천천히 걸으며 마음에 드는 작품을 눌러 감상해 보세요.';
   guideUtterance=new SpeechSynthesisUtterance(line);guideUtterance.voice=voice;guideUtterance.lang='ko-KR';guideUtterance.rate=.88;guideUtterance.pitch=.96;guideUtterance.volume=.82;if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.018,audioContext.currentTime+.35);const finish=()=>{guideUtterance=null;if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.055,audioContext.currentTime+.8)};guideUtterance.onend=finish;guideUtterance.onerror=finish;speechSynthesis.speak(guideUtterance)
 }
 function stopGuideVoice(){if('speechSynthesis' in window)speechSynthesis.cancel();guideUtterance=null;if(audioContext&&audioMaster&&musicOn)audioMaster.gain.linearRampToValueAtTime(.055,audioContext.currentTime+.4)}
