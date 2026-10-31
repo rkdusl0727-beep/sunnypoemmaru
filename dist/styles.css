@@ -58,4 +58,7 @@ body[data-gallery-theme="storybook"] .intro{background:radial-gradient(circle at
 .intro,body[data-gallery-theme="storybook"] .intro{background:linear-gradient(180deg,#fffef7 0%,#fffbe9 52%,#fff4cf 100%);backdrop-filter:none}
 .intro::before{display:none}
 .intro-curator{width:min(27vw,400px);right:2vw;bottom:-1vh}
+.poem-card,.index-panel,.settings-panel{box-shadow:none}
+.open .poem-card{box-shadow:-30px 0 80px #0008}
+.index-panel.open,.settings-panel.open{box-shadow:-30px 0 70px #52351c48}
 @media(max-width:700px){.intro-curator{width:min(60vw,320px);right:-3vw;bottom:-.5vh}}
