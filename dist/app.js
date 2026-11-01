@@ -219,14 +219,15 @@ function animate(){
 function updateCurator(dt,now){
   const curator=scene.userData.curator,shadow=scene.userData.curatorShadow;if(!curator)return;
   const hidden=!started||entryActive||tourActive;curator.visible=!hidden;if(shadow)shadow.visible=!hidden;if(hidden)return;
-  const activeLayout=activeChildZone>=0?ZONE_LAYOUT[activeChildZone]:null,activeDistanceSq=activeLayout?(camera.position.x-activeLayout.x)**2+(camera.position.z-activeLayout.z)**2:Infinity,anchoredToZone=!!activeLayout&&activeDistanceSq<64;
-  if(anchoredToZone)curatorTarget.copy(zoneLocalToWorld(activeLayout,0,2.1)).setY(.79);
+  const activeLayout=activeChildZone>=0?ZONE_LAYOUT[activeChildZone]:null,activeDistanceSq=activeLayout?(camera.position.x-activeLayout.x)**2+(camera.position.z-activeLayout.z)**2:Infinity,anchoredToZone=!!activeLayout&&activeDistanceSq<64,movingWithCamera=zoneTravelActive||hasDestination||dragging||moveVelocity.lengthSq()>.01||!!(joy.x||joy.y||keys.w||keys.a||keys.s||keys.d||keys.arrowup||keys.arrowdown||keys.arrowleft||keys.arrowright);
+  if(movingWithCamera){const followDistance=anchoredToZone?2.35:3;curatorTarget.set(camera.position.x-Math.sin(yaw)*followDistance,anchoredToZone?.79:.96,camera.position.z-Math.cos(yaw)*followDistance)}
+  else if(anchoredToZone)curatorTarget.copy(zoneLocalToWorld(activeLayout,0,2.1)).setY(.79);
   else curatorTarget.set(camera.position.x-Math.sin(yaw)*3,.96,camera.position.z-Math.cos(yaw)*3);
   curatorTarget.x=THREE.MathUtils.clamp(curatorTarget.x,-13.15,13.15);curatorTarget.z=THREE.MathUtils.clamp(curatorTarget.z,-11.45,11.45);
-  const step=Math.floor(now*5.5)%2?'A':'B',motion=curatorTarget.clone().sub(curator.position),walking=moveVelocity.lengthSq()>.16||motion.lengthSq()>.018,rightX=Math.cos(yaw),rightZ=-Math.sin(yaw),forwardX=-Math.sin(yaw),forwardZ=-Math.cos(yaw),screenX=motion.x*rightX+motion.z*rightZ,depth=motion.x*forwardX+motion.z*forwardZ;let facing='front';if(walking&&Math.abs(screenX)>Math.abs(depth)*.68)facing='side';else if(walking&&depth>0)facing='back';const tex=walking?curator.userData.textures[`${facing}${step}`]:curator.userData.textures.idle;
+  const step=Math.floor(now*5.5)%2?'A':'B',motion=curatorTarget.clone().sub(curator.position),walking=movingWithCamera||motion.lengthSq()>.018,rightX=Math.cos(yaw),rightZ=-Math.sin(yaw),forwardX=-Math.sin(yaw),forwardZ=-Math.cos(yaw),screenX=motion.x*rightX+motion.z*rightZ,depth=motion.x*forwardX+motion.z*forwardZ;let facing='front';if(walking&&Math.abs(screenX)>Math.abs(depth)*.68)facing='side';else if(walking&&depth>0)facing='back';const tex=walking?curator.userData.textures[`${facing}${step}`]:curator.userData.textures.idle;
   const zoneScaleX=anchoredToZone?1.05:1.28;curator.scale.set(facing==='side'&&screenX>0?-zoneScaleX:zoneScaleX,anchoredToZone?1.58:1.92,1);curator.userData.facing=facing;
   if(curator.userData.currentTexture!==tex){curator.material.map=tex;curator.material.needsUpdate=true;curator.userData.currentTexture=tex}curator.material.rotation=walking?Math.sin(now*11)*.018:Math.sin(now*1.4)*.006;
-  const curatorBaseY=anchoredToZone?.79:.96;curatorTarget.y=walking?curatorBaseY+Math.abs(Math.sin(now*11))*.035:curatorBaseY+Math.sin(now*1.8)*.006;curator.position.lerp(curatorTarget,1-Math.exp(-6.5*dt));if(shadow){shadow.position.x=curator.position.x;shadow.position.z=curator.position.z;shadow.material.opacity=walking?.19:.24}
+  const curatorBaseY=anchoredToZone?.79:.96;curatorTarget.y=walking?curatorBaseY+Math.abs(Math.sin(now*11))*.035:curatorBaseY+Math.sin(now*1.8)*.006;if(movingWithCamera)curator.position.copy(curatorTarget);else curator.position.lerp(curatorTarget,1-Math.exp(-9*dt));if(shadow){shadow.position.x=curator.position.x;shadow.position.z=curator.position.z;shadow.material.opacity=walking?.19:.24}
 }
 
 function startAmbientMusic(){
