@@ -20,9 +20,11 @@ const TOUR_DURATION=10;
 const ENTRY_DURATION=4.2;
 const ZONE_TRAVEL_DURATION=1.55;
 const PITCH_MIN=-.24,PITCH_MAX=.42;
+const MANUAL_MOVE_SPEED=4.4,CLICK_MOVE_MAX_SPEED=3.8,CLICK_STOP_RADIUS=.12,DRAG_THRESHOLD=coarsePointer?14:10;
 let zoneTravelStartAngle=0,zoneTravelAngleDelta=0,zoneTravelStartRadius=0,zoneTravelEndRadius=0,zoneTravelStartYaw=0,zoneTravelEndYaw=0,zoneTravelChild=0;
 const WALK_BOUNDS={minX:-11.55,maxX:11.55,minZ:-9.7,maxZ:10};
 const SAFE_ZONES=[];
+const groundPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0),groundHitPoint=new THREE.Vector3();
 const ZONE_LAYOUT=[
   {x:-11.25,z:-13.15,ry:0},{x:-3.75,z:-13.15,ry:0},{x:3.75,z:-13.15,ry:0},{x:11.25,z:-13.15,ry:0},
   {x:-15,z:-7.5,ry:Math.PI/2},{x:-15,z:0,ry:Math.PI/2},{x:-15,z:7.5,ry:Math.PI/2},
@@ -180,11 +182,11 @@ function bind(){
   addEventListener('resize',resize);
   addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key==='Escape'){closePoem();closeIndex();if(adminMode)closeSettings();stopGuideVoice()}});
   addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
-  canvas.addEventListener('pointerdown',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;dragging=true;dragMoved=false;dragMode=null;dragStartX=lastX=e.clientX;dragStartY=lastY=e.clientY;canvas.classList.add('is-dragging');canvas.setPointerCapture(e.pointerId)});
-  canvas.addEventListener('pointermove',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive||!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY,totalX=e.clientX-dragStartX,totalY=e.clientY-dragStartY;if(Math.abs(totalX)+Math.abs(totalY)>7){dragMoved=true;if(!dragMode)dragMode=e.shiftKey||Math.abs(totalX)>=Math.abs(totalY)*.9?'look':'move'}if(dragMode==='move'){queueDirectionalMove(-dy*.022);canvas.classList.add('is-moving-drag')}else if(dragMode==='look'){yaw-=dx*.0042;pitch=THREE.MathUtils.clamp(pitch-dy*.003,PITCH_MIN,PITCH_MAX);camera.rotation.set(pitch,yaw,0)}lastX=e.clientX;lastY=e.clientY});
+  canvas.addEventListener('pointerdown',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;e.preventDefault();dragging=true;dragMoved=false;dragMode=null;dragStartX=lastX=e.clientX;dragStartY=lastY=e.clientY;canvas.classList.add('is-dragging');canvas.setPointerCapture(e.pointerId)});
+  canvas.addEventListener('pointermove',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive||!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY,totalX=e.clientX-dragStartX,totalY=e.clientY-dragStartY;if(Math.hypot(totalX,totalY)>DRAG_THRESHOLD){dragMoved=true;if(!dragMode)dragMode=e.shiftKey||Math.abs(totalX)>=Math.abs(totalY)*.9?'look':'move'}if(dragMode==='move'){queueDirectionalMove(-dy*.016);canvas.classList.add('is-moving-drag')}else if(dragMode==='look'){yaw-=dx*.0038;pitch=THREE.MathUtils.clamp(pitch-dy*.0028,PITCH_MIN,PITCH_MAX);camera.rotation.set(pitch,yaw,0)}lastX=e.clientX;lastY=e.clientY});
   const finishDrag=e=>{if(dragging&&!dragMoved&&e?.type==='pointerup')handleWorldClick(e.clientX,e.clientY);dragging=false;dragMode=null;canvas.classList.remove('is-dragging','is-moving-drag')};
   canvas.addEventListener('pointerleave',finishDrag);canvas.addEventListener('pointercancel',finishDrag);canvas.addEventListener('lostpointercapture',finishDrag);canvas.addEventListener('pointerup',finishDrag);
-  canvas.addEventListener('wheel',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;e.preventDefault();if(e.shiftKey){pitch=THREE.MathUtils.clamp(pitch-e.deltaY*.00075,PITCH_MIN,PITCH_MAX);camera.rotation.x=pitch;return}const distance=THREE.MathUtils.clamp(-e.deltaY*.016,-2.4,2.4);if(Math.abs(distance)>.03)queueDirectionalMove(distance)},{passive:false});
+  canvas.addEventListener('wheel',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;e.preventDefault();if(e.shiftKey){pitch=THREE.MathUtils.clamp(pitch-e.deltaY*.0007,PITCH_MIN,PITCH_MAX);camera.rotation.x=pitch;return}const distance=THREE.MathUtils.clamp(-e.deltaY*.01,-1.4,1.4);if(Math.abs(distance)>.03)queueDirectionalMove(distance)},{passive:false});
   $('#enter').onclick=()=>{started=true;showEntryPortal();$('#intro').classList.add('closed');$('#hud').hidden=false;startAmbientMusic();startEntrySequence()};
   $('#home').onclick=()=>{hideEntryPortal(true);$('#intro').classList.remove('closed');$('#hud').hidden=true;$('#hud').classList.remove('cinematic');started=false;tourActive=false;entryActive=false;zoneTravelActive=false;hasDestination=false;resetEntrance();stopAmbientMusic();stopGuideVoice()};
   $('#music-toggle').onclick=()=>musicOn?stopAmbientMusic():startAmbientMusic();
@@ -203,10 +205,14 @@ function animate(){
     if(entryActive){updateEntrySequence(dt);updateMap()}else if(tourActive){updatePanoramaTour(dt);updateZone();updateMap()}else if(zoneTravelActive){updateZoneTravel(dt);updateMap()}else{
       const forward=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0)-joy.y;
       const side=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0)+joy.x;
-      if(forward||side){hasDestination=false;scene.userData.clickMarker.visible=false;moveTarget.set(-Math.sin(yaw)*forward+Math.cos(yaw)*side,0,-Math.cos(yaw)*forward-Math.sin(yaw)*side);if(moveTarget.lengthSq()>1)moveTarget.normalize();moveTarget.multiplyScalar(7.4)}
-      else if(hasDestination){moveTarget.set(moveDestination.x-camera.position.x,0,moveDestination.z-camera.position.z);const distance=moveTarget.length();if(distance<.28){hasDestination=false;scene.userData.clickMarker.visible=false;moveTarget.set(0,0,0)}else{if(destinationTurnsView){const desiredYaw=Math.atan2(-moveTarget.x,-moveTarget.z);yaw=dampAngle(yaw,desiredYaw,1-Math.exp(-7*dt))}moveTarget.normalize().multiplyScalar(Math.min(7.2,Math.max(1.3,distance*2.7)))}}
+      if(forward||side){hasDestination=false;scene.userData.clickMarker.visible=false;moveTarget.set(-Math.sin(yaw)*forward+Math.cos(yaw)*side,0,-Math.cos(yaw)*forward-Math.sin(yaw)*side);if(moveTarget.lengthSq()>1)moveTarget.normalize();moveTarget.multiplyScalar(MANUAL_MOVE_SPEED)}
+      else if(hasDestination){
+        moveTarget.set(moveDestination.x-camera.position.x,0,moveDestination.z-camera.position.z);const distance=moveTarget.length();
+        if(distance<=CLICK_STOP_RADIUS){camera.position.x=moveDestination.x;camera.position.z=moveDestination.z;hasDestination=false;scene.userData.clickMarker.visible=false;moveTarget.set(0,0,0);moveVelocity.set(0,0,0)}
+        else{if(destinationTurnsView){const desiredYaw=Math.atan2(-moveTarget.x,-moveTarget.z);yaw=dampAngle(yaw,desiredYaw,1-Math.exp(-5*dt))}const targetSpeed=Math.min(CLICK_MOVE_MAX_SPEED,Math.max(.22,distance*1.45),Math.sqrt(distance*6.5));moveTarget.normalize().multiplyScalar(targetSpeed)}
+      }
       else moveTarget.set(0,0,0);
-      moveVelocity.lerp(moveTarget,1-Math.exp(-(moveTarget.lengthSq()>.01?11:8)*dt));camera.position.addScaledVector(moveVelocity,dt);
+      moveVelocity.lerp(moveTarget,1-Math.exp(-(moveTarget.lengthSq()>.01?6.5:11)*dt));camera.position.addScaledVector(moveVelocity,dt);
       if(constrainWalkPosition(camera.position))moveVelocity.multiplyScalar(.22);
       camera.position.y=1.65;camera.rotation.set(pitch,yaw,0);updateZone();updateFocus();updateMap();
     }
@@ -254,20 +260,21 @@ function updateFocus(){
 }
 function activateCenter(){if(camera.userData.focus){const d=camera.userData.focus.userData;openPoem(d.child,d.poem)}}
 function setMoveDestination(target,turnsView=true,showMarker=true){
-  moveDestination.copy(target);moveDestination.y=0;constrainWalkPosition(moveDestination);destinationTurnsView=turnsView;hasDestination=true;moveVelocity.multiplyScalar(.35);const marker=scene.userData.clickMarker;marker.position.set(moveDestination.x,.018,moveDestination.z);marker.visible=showMarker
+  moveDestination.copy(target);moveDestination.y=0;constrainWalkPosition(moveDestination);destinationTurnsView=turnsView;const distance=Math.hypot(moveDestination.x-camera.position.x,moveDestination.z-camera.position.z);hasDestination=distance>CLICK_STOP_RADIUS;moveVelocity.multiplyScalar(.2);const marker=scene.userData.clickMarker;marker.position.set(moveDestination.x,.018,moveDestination.z);marker.visible=showMarker&&hasDestination;if(!hasDestination)moveVelocity.set(0,0,0)
 }
 function queueDirectionalMove(distance){
   if(!Number.isFinite(distance)||Math.abs(distance)<.001)return;const direction=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw)),base=hasDestination&&!destinationTurnsView?moveDestination:camera.position,target=base.clone().addScaledVector(direction,distance);setMoveDestination(target,false,false)
 }
 function handleWorldClick(x,y){
-  clickPoint.set(x/innerWidth*2-1,-(y/innerHeight)*2+1);raycaster.setFromCamera(clickPoint,camera);
-  const subject=raycaster.intersectObjects(frameMeshes,false)[0],curatorHit=scene.userData.curator?.visible?raycaster.intersectObject(scene.userData.curator,false)[0]:null,navigationHit=raycaster.intersectObjects(navigationMeshes,false)[0],floorHit=raycaster.intersectObject(scene.userData.floor,false)[0];
-  const nearestDistance=Math.min(subject?.distance??Infinity,curatorHit?.distance??Infinity,navigationHit?.distance??Infinity,floorHit?.distance??Infinity);
-  if(curatorHit&&curatorHit.distance===nearestDistance)return;
-  if(subject&&subject.distance===nearestDistance){const d=subject.object.userData;openPoem(d.child,d.poem);return}
+  const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height||x<rect.left||x>rect.right||y<rect.top||y>rect.bottom)return;
+  clickPoint.set((x-rect.left)/rect.width*2-1,-((y-rect.top)/rect.height*2-1));raycaster.setFromCamera(clickPoint,camera);
+  const subject=raycaster.intersectObjects(frameMeshes,false)[0],navigationHit=raycaster.intersectObjects(navigationMeshes,false)[0],floorHit=raycaster.intersectObject(scene.userData.floor,false)[0];
+  if(subject&&subject.distance<7){const d=subject.object.userData;openPoem(d.child,d.poem);return}
+  const nearestDistance=Math.min(navigationHit?.distance??Infinity,floorHit?.distance??Infinity);
   if(navigationHit&&navigationHit.distance===nearestDistance){setMoveDestination(navigationHit.object.userData.target,true,true);return}
   if(floorHit){setMoveDestination(floorHit.point,true,true);return}
-  const direction=raycaster.ray.direction.clone();direction.y=0;if(direction.lengthSq()<.01)return;direction.normalize();setMoveDestination(camera.position.clone().addScaledVector(direction,6),true,true)
+  if(raycaster.ray.intersectPlane(groundPlane,groundHitPoint)){setMoveDestination(groundHitPoint,true,true);return}
+  const fallbackDirection=raycaster.ray.direction.clone();fallbackDirection.y=0;if(fallbackDirection.lengthSq()>.01){fallbackDirection.normalize();setMoveDestination(camera.position.clone().addScaledVector(fallbackDirection,6),true,true)}
 }
 function constrainWalkPosition(position){
   let adjusted=false,x=THREE.MathUtils.clamp(position.x,WALK_BOUNDS.minX,WALK_BOUNDS.maxX),z=THREE.MathUtils.clamp(position.z,WALK_BOUNDS.minZ,WALK_BOUNDS.maxZ);if(x!==position.x||z!==position.z)adjusted=true;position.x=x;position.z=z;
