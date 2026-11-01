@@ -8,6 +8,7 @@ const canvas=$('#gallery-canvas');
 let scene,camera,renderer,clock,raycaster,frameMeshes=[],navigationMeshes=[],yaw=0,pitch=0,started=false,modalOpen=false,overviewMode=false;
 let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,dragMode=null,dragStartX=0,dragStartY=0,lastX=0,lastY=0,keys={},joy={x:0,y:0};
 let tourActive=false,tourElapsed=0,entryActive=false,entryElapsed=0,hasDestination=false,zoneTravelActive=false,zoneTravelElapsed=0;
+let activeChildZone=-1;
 let destinationTurnsView=true;
 let audioContext,audioMaster,musicTimer,musicStep=0,musicOn=true;
 let guideUtterance=null,guideAudioBufferPromise=null,guideAudioSource=null,guideAudioPending=false,guidePlayed=false,contactShadowTexture=null;
@@ -218,12 +219,14 @@ function animate(){
 function updateCurator(dt,now){
   const curator=scene.userData.curator,shadow=scene.userData.curatorShadow;if(!curator)return;
   const hidden=!started||entryActive||tourActive;curator.visible=!hidden;if(shadow)shadow.visible=!hidden;if(hidden)return;
-  curatorTarget.set(camera.position.x-Math.sin(yaw)*3+Math.cos(yaw)*.95,.96,camera.position.z-Math.cos(yaw)*3-Math.sin(yaw)*.95);
+  const activeLayout=activeChildZone>=0?ZONE_LAYOUT[activeChildZone]:null,activeDistanceSq=activeLayout?(camera.position.x-activeLayout.x)**2+(camera.position.z-activeLayout.z)**2:Infinity,anchoredToZone=!!activeLayout&&activeDistanceSq<64;
+  if(anchoredToZone)curatorTarget.copy(zoneLocalToWorld(activeLayout,0,2.1)).setY(.79);
+  else curatorTarget.set(camera.position.x-Math.sin(yaw)*3,.96,camera.position.z-Math.cos(yaw)*3);
   curatorTarget.x=THREE.MathUtils.clamp(curatorTarget.x,-13.15,13.15);curatorTarget.z=THREE.MathUtils.clamp(curatorTarget.z,-11.45,11.45);
   const step=Math.floor(now*5.5)%2?'A':'B',motion=curatorTarget.clone().sub(curator.position),walking=moveVelocity.lengthSq()>.16||motion.lengthSq()>.018,rightX=Math.cos(yaw),rightZ=-Math.sin(yaw),forwardX=-Math.sin(yaw),forwardZ=-Math.cos(yaw),screenX=motion.x*rightX+motion.z*rightZ,depth=motion.x*forwardX+motion.z*forwardZ;let facing='front';if(walking&&Math.abs(screenX)>Math.abs(depth)*.68)facing='side';else if(walking&&depth>0)facing='back';const tex=walking?curator.userData.textures[`${facing}${step}`]:curator.userData.textures.idle;
-  curator.scale.x=facing==='side'&&screenX>0?-1.28:1.28;curator.userData.facing=facing;
+  const zoneScaleX=anchoredToZone?1.05:1.28;curator.scale.set(facing==='side'&&screenX>0?-zoneScaleX:zoneScaleX,anchoredToZone?1.58:1.92,1);curator.userData.facing=facing;
   if(curator.userData.currentTexture!==tex){curator.material.map=tex;curator.material.needsUpdate=true;curator.userData.currentTexture=tex}curator.material.rotation=walking?Math.sin(now*11)*.018:Math.sin(now*1.4)*.006;
-  curatorTarget.y=walking?.96+Math.abs(Math.sin(now*11))*.035:.96+Math.sin(now*1.8)*.006;curator.position.lerp(curatorTarget,1-Math.exp(-6.5*dt));if(shadow){shadow.position.x=curator.position.x;shadow.position.z=curator.position.z;shadow.material.opacity=walking?.19:.24}
+  const curatorBaseY=anchoredToZone?.79:.96;curatorTarget.y=walking?curatorBaseY+Math.abs(Math.sin(now*11))*.035:curatorBaseY+Math.sin(now*1.8)*.006;curator.position.lerp(curatorTarget,1-Math.exp(-6.5*dt));if(shadow){shadow.position.x=curator.position.x;shadow.position.z=curator.position.z;shadow.material.opacity=walking?.19:.24}
 }
 
 function startAmbientMusic(){
@@ -239,8 +242,9 @@ function playAmbientChord(){
 }
 function updateMusicButton(){const b=$('#music-toggle');if(!b)return;b.classList.toggle('muted',!musicOn);b.setAttribute('aria-pressed',String(musicOn));b.setAttribute('aria-label',musicOn?'전시 음악 끄기':'전시 음악 켜기')}
 function updateZone(){
-  if(Math.abs(camera.position.x)<5.2&&Math.abs(camera.position.z)<5.2){$('#zone-name').textContent='중앙 햇살 통로';return}
-  let nearest=0,best=Infinity;ZONE_LAYOUT.forEach((zone,i)=>{const d=(camera.position.x-zone.x)**2+(camera.position.z-zone.z)**2;if(d<best){best=d;nearest=i}});$('#zone-name').textContent=`${children[nearest].name}의 방`;
+  if(Math.abs(camera.position.x)<5.2&&Math.abs(camera.position.z)<5.2){activeChildZone=-1;$('#zone-name').textContent='중앙 햇살 통로';return}
+  if(activeChildZone>=0){const zone=ZONE_LAYOUT[activeChildZone],d=(camera.position.x-zone.x)**2+(camera.position.z-zone.z)**2;if(d<64){$('#zone-name').textContent=`${children[activeChildZone].name}의 방`;return}}
+  let nearest=0,best=Infinity;ZONE_LAYOUT.forEach((zone,i)=>{const d=(camera.position.x-zone.x)**2+(camera.position.z-zone.z)**2;if(d<best){best=d;nearest=i}});activeChildZone=nearest;$('#zone-name').textContent=`${children[nearest].name}의 방`;
 }
 function updateFocus(){
   raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
@@ -277,7 +281,7 @@ function hideEntryPortal(immediate=false){
   const portal=$('#entry-portal');clearTimeout(entryPortalOpenTimer);clearTimeout(entryPortalHideTimer);entryPortalOpenTimer=entryPortalHideTimer=null;if(!portal)return;portal.classList.remove('active');if(immediate)portal.classList.remove('open');else setTimeout(()=>portal.classList.remove('open'),450)
 }
 function startEntrySequence(){
-  hasDestination=false;tourActive=false;zoneTravelActive=false;entryActive=true;entryElapsed=0;moveVelocity.set(0,0,0);$('#hud').classList.add('cinematic');(scene.userData.doors||[]).forEach(door=>{door.rotation.y=0;door.visible=true});camera.position.set(0,1.68,16.5);yaw=0;pitch=0;camera.fov=68;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='전시장 입구'
+  activeChildZone=-1;hasDestination=false;tourActive=false;zoneTravelActive=false;entryActive=true;entryElapsed=0;moveVelocity.set(0,0,0);$('#hud').classList.add('cinematic');(scene.userData.doors||[]).forEach(door=>{door.rotation.y=0;door.visible=true});camera.position.set(0,1.68,16.5);yaw=0;pitch=0;camera.fov=68;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='전시장 입구'
 }
 function updateEntrySequence(dt){
   entryElapsed=Math.min(ENTRY_DURATION,entryElapsed+dt);const t=entryElapsed/ENTRY_DURATION,doorT=THREE.MathUtils.smoothstep(THREE.MathUtils.clamp((t-.18)/.34,0,1),0,1),walkT=THREE.MathUtils.smoothstep(THREE.MathUtils.clamp((t-.44)/.56,0,1),0,1),doors=scene.userData.doors||[];if(doors[0])doors[0].rotation.y=-doorT*1.08;if(doors[1])doors[1].rotation.y=doorT*1.08;camera.position.z=THREE.MathUtils.lerp(16.5,11.2,walkT);doors.forEach(door=>door.visible=camera.position.z>14.35);camera.position.y=1.68+Math.sin(walkT*Math.PI)*.035;camera.rotation.set(0,0,0);if(t>=1){entryActive=false;$('#hud').classList.remove('cinematic');camera.fov=72;camera.updateProjectionMatrix();startPanoramaTour()}
@@ -288,11 +292,11 @@ function startPanoramaTour(){
 function updatePanoramaTour(dt){
   tourElapsed=Math.min(TOUR_DURATION,tourElapsed+dt);const t=tourElapsed/TOUR_DURATION,e=t*t*(3-2*t),angle=e*Math.PI*2;camera.position.set(Math.sin(angle)*9.1,2.08,Math.cos(angle)*8.2);const dx=-camera.position.x,dz=-camera.position.z;yaw=Math.atan2(-dx,-dz);pitch=-.03;camera.rotation.set(pitch,yaw,0);if(t>=1)finishPanoramaTour()
 }
-function finishPanoramaTour(){tourActive=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,9.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구';setTimeout(()=>{if(started&&!entryActive&&!tourActive)speakCurator()},500)}
+function finishPanoramaTour(){activeChildZone=-1;tourActive=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,9.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구';setTimeout(()=>{if(started&&!entryActive&&!tourActive)speakCurator()},500)}
 function dampAngle(a,b,t){let d=(b-a+Math.PI)%(Math.PI*2)-Math.PI;if(d<-Math.PI)d+=Math.PI*2;return a+d*t}
-function showOverview(){tourActive=false;entryActive=false;zoneTravelActive=false;hasDestination=false;scene.userData.clickMarker.visible=false;overviewMode=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,9.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구'}
+function showOverview(){activeChildZone=-1;tourActive=false;entryActive=false;zoneTravelActive=false;hasDestination=false;scene.userData.clickMarker.visible=false;overviewMode=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,9.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구'}
 function goToChildZone(ci){
-  const layout=ZONE_LAYOUT[ci];closeIndex();closePoem();if(!started){started=true;$('#intro').classList.add('closed');$('#hud').hidden=false;startAmbientMusic();resetEntrance()}
+  const layout=ZONE_LAYOUT[ci];activeChildZone=ci;closeIndex();closePoem();if(!started){started=true;$('#intro').classList.add('closed');$('#hud').hidden=false;startAmbientMusic();resetEntrance()}
   entryActive=false;tourActive=false;hasDestination=false;scene.userData.clickMarker.visible=false;moveVelocity.set(0,0,0);zoneTravelChild=ci;zoneTravelElapsed=0;zoneTravelActive=true;zoneTravelStart.copy(camera.position);zoneTravelEnd.copy(zoneLocalToWorld(layout,0,4.45));zoneTravelEnd.y=1.65;
   zoneTravelStartRadius=Math.max(3.6,Math.hypot(zoneTravelStart.x,zoneTravelStart.z));zoneTravelEndRadius=Math.hypot(zoneTravelEnd.x,zoneTravelEnd.z);zoneTravelStartAngle=Math.atan2(zoneTravelStart.z,zoneTravelStart.x);const endAngle=Math.atan2(zoneTravelEnd.z,zoneTravelEnd.x);zoneTravelAngleDelta=(endAngle-zoneTravelStartAngle+Math.PI*3)%(Math.PI*2)-Math.PI;zoneTravelStartYaw=yaw;zoneTravelEndYaw=Math.atan2(-(layout.x-zoneTravelEnd.x),-(layout.z-zoneTravelEnd.z));pitch=0;$('#zone-name').textContent=`${children[ci].name}의 방으로 이동 중`
 }
