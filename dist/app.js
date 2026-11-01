@@ -8,12 +8,12 @@ const canvas=$('#gallery-canvas');
 let scene,camera,renderer,clock,raycaster,frameMeshes=[],navigationMeshes=[],yaw=0,pitch=0,started=false,modalOpen=false,overviewMode=false;
 let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,dragMode=null,dragStartX=0,dragStartY=0,lastX=0,lastY=0,keys={},joy={x:0,y:0};
 let tourActive=false,tourElapsed=0,entryActive=false,entryElapsed=0,hasDestination=false,zoneTravelActive=false,zoneTravelElapsed=0;
-let activeChildZone=-1;
+let activeChildZone=-1,lastFocusedArtwork=null;
 let destinationTurnsView=true;
 let audioContext,audioMaster,musicTimer,musicStep=0,musicOn=true;
 let guideUtterance=null,guideAudioBufferPromise=null,guideAudioSource=null,guideAudioPending=false,guidePlayed=false,contactShadowTexture=null;
 let entryPortalOpenTimer=null,entryPortalHideTimer=null;
-const coarsePointer=matchMedia('(pointer:coarse)').matches||innerWidth<800,reduceMotion=matchMedia('(prefers-reduced-motion:reduce)').matches,moveVelocity=new THREE.Vector3(),moveTarget=new THREE.Vector3(),moveDestination=new THREE.Vector3(),curatorTarget=new THREE.Vector3(),clickPoint=new THREE.Vector2();
+const coarsePointer=matchMedia('(pointer:coarse)').matches||innerWidth<800,reduceMotion=matchMedia('(prefers-reduced-motion:reduce)').matches,moveVelocity=new THREE.Vector3(),moveTarget=new THREE.Vector3(),moveDestination=new THREE.Vector3(),curatorTarget=new THREE.Vector3(),curatorArtworkPoint=new THREE.Vector3(),clickPoint=new THREE.Vector2();
 const cameraPos=new THREE.Vector3(0,1.65,11.2);
 const zoneTravelStart=new THREE.Vector3(),zoneTravelEnd=new THREE.Vector3();
 const TOUR_DURATION=10;
@@ -225,12 +225,12 @@ function animate(){
 function updateCurator(dt,now){
   const curator=scene.userData.curator,shadow=scene.userData.curatorShadow;if(!curator)return;
   const hidden=!started||entryActive||tourActive;curator.visible=!hidden;if(shadow)shadow.visible=!hidden;if(hidden)return;
-  const activeLayout=activeChildZone>=0?ZONE_LAYOUT[activeChildZone]:null,activeDistanceSq=activeLayout?(camera.position.x-activeLayout.x)**2+(camera.position.z-activeLayout.z)**2:Infinity,anchoredToZone=!!activeLayout&&activeDistanceSq<64,movingWithCamera=zoneTravelActive||hasDestination||dragging||moveVelocity.lengthSq()>.01||!!(joy.x||joy.y||keys.w||keys.a||keys.s||keys.d||keys.arrowup||keys.arrowdown||keys.arrowleft||keys.arrowright);
+  const activeLayout=activeChildZone>=0?ZONE_LAYOUT[activeChildZone]:null,activeDistanceSq=activeLayout?(camera.position.x-activeLayout.x)**2+(camera.position.z-activeLayout.z)**2:Infinity,anchoredToZone=!!activeLayout&&activeDistanceSq<64,movingWithCamera=zoneTravelActive||hasDestination||dragging||moveVelocity.lengthSq()>.01||!!(joy.x||joy.y||keys.w||keys.a||keys.s||keys.d||keys.arrowup||keys.arrowdown||keys.arrowleft||keys.arrowright),rightX=Math.cos(yaw),rightZ=-Math.sin(yaw),forwardX=-Math.sin(yaw),forwardZ=-Math.cos(yaw);
   if(movingWithCamera){const followDistance=anchoredToZone?2.35:3;curatorTarget.set(camera.position.x-Math.sin(yaw)*followDistance,anchoredToZone?.79:.96,camera.position.z-Math.cos(yaw)*followDistance)}
-  else if(anchoredToZone)curatorTarget.copy(zoneLocalToWorld(activeLayout,0,2.1)).setY(.79);
+  else if(anchoredToZone){const focused=camera.userData.focus?.userData?.child===activeChildZone?camera.userData.focus:lastFocusedArtwork?.userData?.child===activeChildZone?lastFocusedArtwork:null;let side=activeChildZone%2?-1:1;if(focused){focused.getWorldPosition(curatorArtworkPoint).project(camera);if(Math.abs(curatorArtworkPoint.x)>.12)side=curatorArtworkPoint.x<0?1:-1;else if(focused.userData.poem!==2)side=focused.userData.poem<2?1:-1}const forwardDistance=coarsePointer?2.65:2.5,sideDistance=coarsePointer?.22:1.45;curatorTarget.set(camera.position.x+forwardX*forwardDistance+rightX*side*sideDistance,.79,camera.position.z+forwardZ*forwardDistance+rightZ*side*sideDistance)}
   else curatorTarget.set(camera.position.x-Math.sin(yaw)*3,.96,camera.position.z-Math.cos(yaw)*3);
   curatorTarget.x=THREE.MathUtils.clamp(curatorTarget.x,-13.15,13.15);curatorTarget.z=THREE.MathUtils.clamp(curatorTarget.z,-11.45,11.45);
-  const step=Math.floor(now*5.5)%2?'A':'B',motion=curatorTarget.clone().sub(curator.position),walking=movingWithCamera||motion.lengthSq()>.018,rightX=Math.cos(yaw),rightZ=-Math.sin(yaw),forwardX=-Math.sin(yaw),forwardZ=-Math.cos(yaw),screenX=motion.x*rightX+motion.z*rightZ,depth=motion.x*forwardX+motion.z*forwardZ;let facing='front';if(walking&&Math.abs(screenX)>Math.abs(depth)*.68)facing='side';else if(walking&&depth>0)facing='back';const tex=walking?curator.userData.textures[`${facing}${step}`]:curator.userData.textures.idle;
+  const step=Math.floor(now*5.5)%2?'A':'B',motion=curatorTarget.clone().sub(curator.position),walking=movingWithCamera||motion.lengthSq()>.018,screenX=motion.x*rightX+motion.z*rightZ,depth=motion.x*forwardX+motion.z*forwardZ;let facing='front';if(walking&&Math.abs(screenX)>Math.abs(depth)*.68)facing='side';else if(walking&&depth>0)facing='back';const tex=walking?curator.userData.textures[`${facing}${step}`]:curator.userData.textures.idle;
   const zoneScaleX=anchoredToZone?1.05:1.28;curator.scale.set(facing==='side'&&screenX>0?-zoneScaleX:zoneScaleX,anchoredToZone?1.58:1.92,1);curator.userData.facing=facing;
   if(curator.userData.currentTexture!==tex){curator.material.map=tex;curator.material.needsUpdate=true;curator.userData.currentTexture=tex}curator.material.rotation=walking?Math.sin(now*11)*.018:Math.sin(now*1.4)*.006;
   const curatorBaseY=anchoredToZone?.79:.96;curatorTarget.y=walking?curatorBaseY+Math.abs(Math.sin(now*11))*.035:curatorBaseY+Math.sin(now*1.8)*.006;if(movingWithCamera)curator.position.copy(curatorTarget);else curator.position.lerp(curatorTarget,1-Math.exp(-9*dt));if(shadow){shadow.position.x=curator.position.x;shadow.position.z=curator.position.z;shadow.material.opacity=walking?.19:.24}
@@ -256,7 +256,7 @@ function updateZone(){
 function updateFocus(){
   raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
   const hits=raycaster.intersectObjects(frameMeshes,false),hit=hits[0]&&hits[0].distance<7?hits[0]:null;
-  $('#crosshair').classList.toggle('active',!!hit);camera.userData.focus=hit?.object||null;
+  $('#crosshair').classList.toggle('active',!!hit);camera.userData.focus=hit?.object||null;if(hit)lastFocusedArtwork=hit.object;
 }
 function activateCenter(){if(camera.userData.focus){const d=camera.userData.focus.userData;openPoem(d.child,d.poem)}}
 function setMoveDestination(target,turnsView=true,showMarker=true){
