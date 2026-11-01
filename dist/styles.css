@@ -54,14 +54,14 @@ body[data-gallery-theme="storybook"] .intro{background:radial-gradient(circle at
 .intro h1,.intro>button,.logo,.zone-label strong,.poem-card h2,.poem-meta strong,.index-panel h2,.index-child-go strong,.curator-card h2,.settings-panel h2,.gallery-config h3,.scan-child h3,.poem-scan-empty strong{font-family:var(--display-font);font-weight:400}
 .intro h1{line-height:1.08;letter-spacing:.015em}.intro h1 em{margin-bottom:.12em}.logo,.zone-label strong{letter-spacing:.015em}
 
-/* 메인 화면: 가장자리 비네팅 없이 고른 파스텔 햇살과 더 큰 큐레이터 */
+/* 메인 화면: 가장자리 비네팅 없이 고른 파스텔 햇살과 장식에 겹치지 않는 큐레이터 */
 .intro,body[data-gallery-theme="storybook"] .intro{background:linear-gradient(180deg,#fffef7 0%,#fffbe9 52%,#fff4cf 100%);backdrop-filter:none}
 .intro::before{display:none}
-.intro-curator{width:min(27vw,400px);right:2vw;bottom:-1vh}
+.intro-curator{width:min(20vw,300px);right:5vw;bottom:-1.5vh}
 .poem-card,.index-panel,.settings-panel{box-shadow:none}
 .open .poem-card{box-shadow:-30px 0 80px #0008}
 .index-panel.open,.settings-panel.open{box-shadow:-30px 0 70px #52351c48}
-@media(max-width:700px){.intro-curator{width:min(60vw,320px);right:-3vw;bottom:-.5vh}}
+@media(max-width:700px){.intro-curator{width:min(45vw,250px);right:1vw;bottom:-.5vh}}
 
 /* 첫 표지: 밝기를 유지한 크림·살구 햇살 팔레트 */
 .intro,body[data-gallery-theme="storybook"] .intro{background:linear-gradient(160deg,#fffdf6 0%,#fff6df 48%,#ffe6bf 100%)}
