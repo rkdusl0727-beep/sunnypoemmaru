@@ -62,3 +62,10 @@ body[data-gallery-theme="storybook"] .intro{background:radial-gradient(circle at
 .open .poem-card{box-shadow:-30px 0 80px #0008}
 .index-panel.open,.settings-panel.open{box-shadow:-30px 0 70px #52351c48}
 @media(max-width:700px){.intro-curator{width:min(60vw,320px);right:-3vw;bottom:-.5vh}}
+
+/* 첫 표지: 밝기를 유지한 크림·살구 햇살 팔레트 */
+.intro,body[data-gallery-theme="storybook"] .intro{background:linear-gradient(160deg,#fffdf6 0%,#fff6df 48%,#ffe6bf 100%)}
+.intro h1,body[data-gallery-theme="storybook"] .intro h1{color:#d88b2c;text-shadow:0 3px 0 #fff9,0 12px 32px #e9a83b30}
+.intro h1 em{color:#f0ad38}.kicker{color:#8b7461}.intro>p:not(.kicker){color:#6d5948}.intro-meta{color:#856f5c}
+.intro>button{background:#ffd78e;color:#594635;box-shadow:0 9px 0 #e2ad55}.intro>button:hover{box-shadow:0 12px 0 #e2ad55}
+.intro-illustrations img{filter:drop-shadow(0 18px 24px #b8783030) saturate(1.06) brightness(1.025)}
