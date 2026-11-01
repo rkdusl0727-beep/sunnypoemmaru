@@ -15,7 +15,7 @@ const coarsePointer=matchMedia('(pointer:coarse)').matches||innerWidth<800,reduc
 const cameraPos=new THREE.Vector3(0,1.65,11.2);
 const zoneTravelStart=new THREE.Vector3(),zoneTravelEnd=new THREE.Vector3();
 const TOUR_DURATION=10;
-const ENTRY_DURATION=3.6;
+const ENTRY_DURATION=4.6;
 const ZONE_TRAVEL_DURATION=1.55;
 const PITCH_MIN=-.24,PITCH_MAX=.42;
 let zoneTravelStartAngle=0,zoneTravelAngleDelta=0,zoneTravelStartRadius=0,zoneTravelEndRadius=0,zoneTravelStartYaw=0,zoneTravelEndYaw=0,zoneTravelChild=0;
@@ -152,7 +152,7 @@ function buildPlant(x,z){
 }
 function buildCurator(){
   const loader=new THREE.TextureLoader(),textures={idle:loader.load('assets/curator-maru.png'),frontA:loader.load('assets/curator-walk-a.png'),frontB:loader.load('assets/curator-walk-b.png'),sideA:loader.load('assets/curator-side-a.png'),sideB:loader.load('assets/curator-side-b.png'),backA:loader.load('assets/curator-back-a.png'),backB:loader.load('assets/curator-back-b.png')};Object.values(textures).forEach(t=>t.colorSpace=THREE.SRGBColorSpace);
-  const g=new THREE.Sprite(new THREE.SpriteMaterial({map:textures.idle,transparent:true,alphaTest:.04,depthWrite:false}));g.scale.set(1.28,1.92,1);g.position.set(1.35,.96,6.7);g.visible=false;g.renderOrder=4;g.userData={type:'curator',textures,currentTexture:textures.idle,facing:'front'};scene.add(g);scene.userData.curator=g;
+  const g=new THREE.Sprite(new THREE.SpriteMaterial({map:textures.idle,color:0xd7c8b8,transparent:true,alphaTest:.04,depthWrite:false,toneMapped:true}));g.scale.set(1.28,1.92,1);g.position.set(1.35,.96,6.7);g.visible=false;g.renderOrder=4;g.userData={type:'curator',textures,currentTexture:textures.idle,facing:'front'};scene.add(g);scene.userData.curator=g;
   const shadow=makeContactShadow(g.position.x,g.position.z,.86,.34,.24);shadow.visible=false;scene.userData.curatorShadow=shadow;
 }
 function buildWarmLights(){
@@ -273,7 +273,7 @@ function startEntrySequence(){
   hasDestination=false;tourActive=false;zoneTravelActive=false;entryActive=true;entryElapsed=0;moveVelocity.set(0,0,0);$('#hud').classList.add('cinematic');(scene.userData.doors||[]).forEach(door=>{door.rotation.y=0;door.visible=true});camera.position.set(0,1.68,16.5);yaw=0;pitch=0;camera.fov=68;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='전시장 입구'
 }
 function updateEntrySequence(dt){
-  entryElapsed=Math.min(ENTRY_DURATION,entryElapsed+dt);const t=entryElapsed/ENTRY_DURATION,doorT=THREE.MathUtils.smoothstep(Math.min(1,t/.42),0,1),walkT=THREE.MathUtils.smoothstep(Math.max(0,(t-.24)/.76),0,1),doors=scene.userData.doors||[];if(doors[0])doors[0].rotation.y=-doorT*1.08;if(doors[1])doors[1].rotation.y=doorT*1.08;camera.position.z=THREE.MathUtils.lerp(16.5,11.2,walkT);doors.forEach(door=>door.visible=camera.position.z>14.35);camera.position.y=1.68+Math.sin(walkT*Math.PI)*.035;camera.rotation.set(0,0,0);if(t>=1){entryActive=false;$('#hud').classList.remove('cinematic');camera.fov=72;camera.updateProjectionMatrix();startPanoramaTour()}
+  entryElapsed=Math.min(ENTRY_DURATION,entryElapsed+dt);const t=entryElapsed/ENTRY_DURATION,doorT=THREE.MathUtils.smoothstep(THREE.MathUtils.clamp((t-.18)/.34,0,1),0,1),walkT=THREE.MathUtils.smoothstep(THREE.MathUtils.clamp((t-.44)/.56,0,1),0,1),doors=scene.userData.doors||[];if(doors[0])doors[0].rotation.y=-doorT*1.08;if(doors[1])doors[1].rotation.y=doorT*1.08;camera.position.z=THREE.MathUtils.lerp(16.5,11.2,walkT);doors.forEach(door=>door.visible=camera.position.z>14.35);camera.position.y=1.68+Math.sin(walkT*Math.PI)*.035;camera.rotation.set(0,0,0);if(t>=1){entryActive=false;$('#hud').classList.remove('cinematic');camera.fov=72;camera.updateProjectionMatrix();startPanoramaTour()}
 }
 function startPanoramaTour(){
   hasDestination=false;moveVelocity.set(0,0,0);tourElapsed=0;tourActive=!reduceMotion;camera.fov=74;camera.updateProjectionMatrix();camera.position.set(0,2.05,11.2);yaw=0;pitch=-.025;camera.rotation.set(pitch,yaw,0);if(reduceMotion)finishPanoramaTour()
