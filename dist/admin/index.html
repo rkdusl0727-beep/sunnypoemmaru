@@ -10,10 +10,22 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=63">
 </head>
 <body data-admin="true" class="admin-mode">
   <a class="skip" href="#settings-panel">3D 전시를 건너뛰고 설정 열기</a>
+  <section id="admin-auth-gate" class="admin-auth-gate" aria-labelledby="admin-auth-title">
+    <form id="admin-auth-form" class="admin-auth-card">
+      <small>관리자 전용</small>
+      <h1 id="admin-auth-title">관리자 비밀번호 입력</h1>
+      <p id="admin-auth-description">설정한 비밀번호를 입력하면 관리자 모드로 들어갑니다.</p>
+      <label><span>비밀번호</span><input id="admin-auth-password" type="password" minlength="6" autocomplete="current-password" required></label>
+      <label id="admin-auth-confirm-wrap" hidden><span>비밀번호 확인</span><input id="admin-auth-confirm" type="password" minlength="6" autocomplete="new-password"></label>
+      <p id="admin-auth-error" class="admin-auth-error" role="alert" aria-live="polite"></p>
+      <button id="admin-auth-submit" type="submit">관리자 모드 들어가기</button>
+      <a href="/">사용자 화면으로 돌아가기</a>
+    </form>
+  </section>
   <canvas id="gallery-canvas" aria-label="클릭·드래그·마우스 휠로 자유롭게 이동하며 설정을 미리 볼 수 있는 3D 작품 전시장"></canvas>
   <div id="loading" class="loading"><span></span><p>관리자 전시방을 준비하고 있어요</p></div>
 
@@ -44,14 +56,6 @@
       <div id="map-dot" class="map-dot"></div><div id="map-view" class="map-view"></div>
       <span class="map-center" aria-hidden="true"></span><i class="map-ring"></i>
     </aside>
-    <div class="mobile-controls" aria-label="이동 조작">
-      <div id="move-pad" class="move-pad" aria-label="방향 이동 버튼">
-        <button class="move-forward" type="button" data-move="forward">앞</button>
-        <button class="move-left" type="button" data-move="left">왼쪽</button>
-        <button class="move-back" type="button" data-move="back">뒤</button>
-        <button class="move-right" type="button" data-move="right">오른쪽</button>
-      </div>
-    </div>
   </main>
 
   <section id="poem-modal" class="poem-modal" aria-hidden="true" aria-labelledby="poem-title">
@@ -79,14 +83,21 @@
     <section class="gallery-config" aria-labelledby="gallery-config-title">
       <h3 id="gallery-config-title">전시장 기본 설정</h3>
       <label class="name-field" for="gallery-name"><span>전시장 이름</span><div class="name-control"><input id="gallery-name" type="text" maxlength="30" autocomplete="off"><button id="gallery-name-apply" type="button">이름 적용</button></div></label>
+      <label class="child-count-field" for="child-count"><span>참여 어린이 수</span><div class="child-count-control"><input id="child-count" type="number" min="1" max="10" step="1" inputmode="numeric"><button id="child-count-apply" type="button">인원 적용</button></div><small>1명부터 10명까지 설정할 수 있으며, 적용하면 전시 구역과 작품 목록이 함께 바뀝니다.</small></label>
       <fieldset class="theme-field"><legend>전시장 배경</legend><div class="theme-options"><button type="button" data-theme-choice="warm" aria-pressed="false"><i class="theme-preview warm" aria-hidden="true"></i><strong>따뜻한 원목</strong><span>햇살과 밝은 마루</span></button><button type="button" data-theme-choice="storybook" aria-pressed="false"><i class="theme-preview storybook" aria-hidden="true"></i><strong>그림책 원화전</strong><span>크림 벽과 파스텔 전시</span></button></div></fieldset>
       <p>두 배경 모두 실제 문을 열고 입장합니다. 그림책 원화전 배경은 크림색 종이 벽, 파스텔 전시 면, 낮은 원목 진열대와 부드러운 조명을 사용합니다.</p>
+    </section>
+    <section class="password-config" aria-labelledby="password-config-title">
+      <h3 id="password-config-title">관리자 비밀번호 변경</h3>
+      <div class="password-fields"><label><span>현재 비밀번호</span><input id="current-admin-password" type="password" autocomplete="current-password"></label><label><span>새 비밀번호</span><input id="new-admin-password" type="password" minlength="6" autocomplete="new-password"></label><label><span>새 비밀번호 확인</span><input id="confirm-admin-password" type="password" minlength="6" autocomplete="new-password"></label></div>
+      <button id="admin-password-change" type="button">비밀번호 변경</button>
+      <p id="password-change-status" role="status" aria-live="polite"></p>
     </section>
     <p class="settings-note">아이별 작품 5점의 원본 이미지를 넣고, 각 작품에 맞는 액자 방향과 크기를 선택하세요. PNG·JPG 파일 전체가 잘리지 않게 표시됩니다.</p>
     <div id="scan-status" class="scan-status" role="status" aria-live="polite"></div>
     <div id="settings-list" class="settings-list"></div>
   </aside>
 
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=63"></script>
 </body>
 </html>

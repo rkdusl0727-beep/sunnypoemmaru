@@ -1,12 +1,15 @@
 import * as THREE from './vendor/three.module.min.js';
 
 const COLORS=['#ffd464','#82d8c5','#ff8f85','#a99aff','#82bff5','#ffb465','#ec90cc','#94dc84','#7dd1df','#f09c9c'];
-const children=Array.from({length:10},(_,i)=>({id:i+1,name:`어린이 ${String(i+1).padStart(2,'0')}`,color:COLORS[i],poems:Array.from({length:5},(_,j)=>({title:`작품 ${j+1}`}))}));
+const CHILD_COUNT_MIN=1,CHILD_COUNT_MAX=10;
+function readStoredChildCount(){try{const value=Number(JSON.parse(localStorage.getItem('galleryConfig')||'{}').childCount);return Number.isInteger(value)?Math.min(CHILD_COUNT_MAX,Math.max(CHILD_COUNT_MIN,value)):CHILD_COUNT_MAX}catch{return CHILD_COUNT_MAX}}
+const children=Array.from({length:readStoredChildCount()},(_,i)=>({id:i+1,name:`어린이 ${String(i+1).padStart(2,'0')}`,color:COLORS[i],poems:Array.from({length:5},(_,j)=>({title:`작품 ${j+1}`}))}));
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const adminMode=document.body.dataset.admin==='true';
+const ADMIN_CREDENTIAL_KEY='sunnyPoemAdminCredential',ADMIN_SESSION_KEY='sunnyPoemAdminSession';
 const canvas=$('#gallery-canvas');
 let scene,camera,renderer,clock,raycaster,frameMeshes=[],navigationMeshes=[],yaw=0,pitch=0,started=false,modalOpen=false,overviewMode=false;
-let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,dragMode=null,dragStartX=0,dragStartY=0,lastX=0,lastY=0,keys={},joy={x:0,y:0};
+let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,dragMode=null,dragStartX=0,dragStartY=0,lastX=0,lastY=0,keys={};
 let tourActive=false,tourElapsed=0,entryActive=false,entryElapsed=0,hasDestination=false,zoneTravelActive=false,zoneTravelElapsed=0;
 let activeChildZone=-1,lastFocusedArtwork=null;
 let destinationTurnsView=true;
@@ -17,7 +20,7 @@ const coarsePointer=matchMedia('(pointer:coarse)').matches||innerWidth<800,reduc
 const cameraPos=new THREE.Vector3(0,1.65,11.2);
 const zoneTravelStart=new THREE.Vector3(),zoneTravelEnd=new THREE.Vector3();
 const TOUR_DURATION=10;
-const ENTRY_DURATION=4.2;
+const ENTRY_DURATION=5.6;
 const ZONE_TRAVEL_DURATION=1.55;
 const PITCH_MIN=-.24,PITCH_MAX=.42;
 const MANUAL_MOVE_SPEED=4.4,CLICK_MOVE_MAX_SPEED=3.8,CLICK_STOP_RADIUS=.12,DRAG_THRESHOLD=coarsePointer?14:10;
@@ -39,10 +42,12 @@ const FRAME_PRESETS={
   'portrait-small':{label:'세로 소형',w:.8,h:1.18},portrait:{label:'세로 기본',w:1.06,h:1.62},'portrait-large':{label:'세로 대형',w:1.28,h:1.86},
   'landscape-small':{label:'가로 소형',w:1.16,h:.78},landscape:{label:'가로 기본',w:1.48,h:1},'landscape-large':{label:'가로 대형',w:1.78,h:1.18}
 };
-const DEFAULT_GALLERY_CONFIG={name:'햇살 동시 마루',theme:'warm',frames:{}};
+const DEFAULT_GALLERY_CONFIG={name:'햇살 동시 마루',theme:'warm',childCount:10,frames:{}};
 let galleryConfig=loadGalleryConfig();
 
-function init(){
+async function init(){
+  if(!adminMode)sessionStorage.removeItem(ADMIN_SESSION_KEY);
+  else if(!(await initAdminAuth()))return;
   THREE.Cache.enabled=true;
   scene=new THREE.Scene();
   scene.background=new THREE.Color(0xf8eedf);
@@ -56,6 +61,20 @@ function init(){
   clock=new THREE.Clock();raycaster=new THREE.Raycaster();
   buildGallery();bind();buildIndex();if(adminMode)buildSettings();applyGalleryName(galleryConfig.name,false);applyGalleryTheme(galleryConfig.theme,false);loadStoredScans();renderer.compile(scene,camera);if(renderer.shadowMap.enabled){renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true}animate();
   setTimeout(()=>$('#loading').classList.add('done'),450);
+}
+
+function bytesToBase64(bytes){let binary='';bytes.forEach(value=>binary+=String.fromCharCode(value));return btoa(binary)}
+function base64ToBytes(value){const binary=atob(value);return Uint8Array.from(binary,char=>char.charCodeAt(0))}
+function getAdminCredential(){try{const credential=JSON.parse(localStorage.getItem(ADMIN_CREDENTIAL_KEY)||'null');return credential?.salt&&credential?.hash?credential:null}catch{return null}}
+async function deriveAdminHash(password,salt,iterations=120000){const material=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']),bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:base64ToBytes(salt),iterations},material,256);return bytesToBase64(new Uint8Array(bits))}
+async function createAdminCredential(password){const saltBytes=crypto.getRandomValues(new Uint8Array(16)),salt=bytesToBase64(saltBytes),iterations=120000,hash=await deriveAdminHash(password,salt,iterations);return{version:1,salt,hash,iterations}}
+async function verifyAdminPassword(password,credential=getAdminCredential()){if(!credential)return false;try{return await deriveAdminHash(password,credential.salt,credential.iterations)===credential.hash}catch{return false}}
+async function initAdminAuth(){
+  const gate=$('#admin-auth-gate'),form=$('#admin-auth-form'),password=$('#admin-auth-password'),confirmWrap=$('#admin-auth-confirm-wrap'),confirm=$('#admin-auth-confirm'),title=$('#admin-auth-title'),description=$('#admin-auth-description'),submit=$('#admin-auth-submit'),error=$('#admin-auth-error'),credential=getAdminCredential();
+  if(credential&&sessionStorage.getItem(ADMIN_SESSION_KEY)===credential.hash){gate.classList.add('unlocked');return true}
+  const setup=!credential;title.textContent=setup?'관리자 비밀번호 설정':'관리자 비밀번호 입력';description.textContent=setup?'처음 사용할 관리자 비밀번호를 직접 설정하세요. 비밀번호는 이 브라우저에 암호화된 해시로 저장됩니다.':'설정한 비밀번호를 입력하면 관리자 모드로 들어갑니다.';confirmWrap.hidden=!setup;confirm.required=setup;password.autocomplete=setup?'new-password':'current-password';submit.textContent=setup?'비밀번호 설정하고 들어가기':'관리자 모드 들어가기';
+  setTimeout(()=>password.focus(),120);
+  return new Promise(resolve=>{form.onsubmit=async event=>{event.preventDefault();error.textContent='';const value=password.value;if(value.length<6){error.textContent='비밀번호를 6자 이상 입력해 주세요.';password.focus();return}if(setup&&value!==confirm.value){error.textContent='비밀번호 확인이 일치하지 않습니다.';confirm.focus();return}submit.disabled=true;submit.textContent=setup?'비밀번호 설정 중':'확인 중';try{const activeCredential=setup?await createAdminCredential(value):credential,valid=setup||await verifyAdminPassword(value,activeCredential);if(!valid){error.textContent='비밀번호가 맞지 않습니다.';password.select();return}if(setup)localStorage.setItem(ADMIN_CREDENTIAL_KEY,JSON.stringify(activeCredential));sessionStorage.setItem(ADMIN_SESSION_KEY,activeCredential.hash);gate.classList.add('unlocked');resolve(true)}catch{error.textContent='비밀번호를 확인하지 못했습니다. 다시 시도해 주세요.'}finally{submit.disabled=false;submit.textContent=setup?'비밀번호 설정하고 들어가기':'관리자 모드 들어가기'}}})
 }
 
 function buildGallery(){
@@ -80,14 +99,13 @@ function buildGallery(){
   const sunSpot=new THREE.SpotLight(0xffd29a,9,26,Math.PI/5,.92,1);sunSpot.position.set(-7,11,6);sunSpot.target.position.set(1,0,-1);sunSpot.castShadow=false;scene.add(sunSpot,sunSpot.target);
   for(let i=0;i<4;i++){const stripe=new THREE.Mesh(new THREE.PlaneGeometry(.72,10),new THREE.MeshBasicMaterial({color:0xffdfad,transparent:true,opacity:.1,depthWrite:false,side:THREE.DoubleSide}));stripe.rotation.x=-Math.PI/2;stripe.rotation.z=-.58;stripe.position.set(-5+i*1.25,.035,1+i*.35);scene.add(stripe)}
   scene.userData.frameSideMaterial=new THREE.MeshStandardMaterial({color:0x8d5b34,roughness:.72,metalness:0});
-  for(let i=0;i<10;i++)buildZone(i);
+  for(let i=0;i<children.length;i++)buildZone(i);
   buildCurator();buildWarmLights();buildCozyDetails();
 }
 function buildEntrance(){
   const loader=new THREE.TextureLoader(),facadeMap=loader.load('assets/entrance-facade-2d.png'),gardenMap=loader.load('assets/garden-view-2d.png'),doorMap=loader.load('assets/door-leaf-2d.png');[facadeMap,gardenMap,doorMap].forEach(t=>t.colorSpace=THREE.SRGBColorSpace);
   const deck=new THREE.Mesh(new THREE.PlaneGeometry(7.6,6.2),new THREE.MeshStandardMaterial({map:scene.userData.floorTexture,color:0xffffff,roughness:.88}));deck.rotation.x=-Math.PI/2;deck.position.set(0,-.005,15.75);deck.receiveShadow=true;scene.add(deck);
   const gardenBackdrop=new THREE.Mesh(new THREE.PlaneGeometry(22,9.6),new THREE.MeshBasicMaterial({map:gardenMap,side:THREE.DoubleSide}));gardenBackdrop.position.set(0,4.3,21);scene.add(gardenBackdrop);
-  const gardenFrame=new THREE.Mesh(new THREE.PlaneGeometry(22.72,10.24),new THREE.MeshBasicMaterial({map:scene.userData.frameTexture,transparent:true,alphaTest:.035,depthWrite:false,toneMapped:true,side:THREE.DoubleSide}));gardenFrame.position.set(0,4.3,20.94);gardenFrame.renderOrder=2;scene.add(gardenFrame);scene.userData.gardenFrame=gardenFrame;
   const wallMaterial=new THREE.MeshStandardMaterial({map:scene.userData.cottonTexture,color:0xfff3df,roughness:.96,side:THREE.DoubleSide}),baseMaterial=new THREE.MeshStandardMaterial({color:0xc99662,roughness:.88}),trimMaterial=new THREE.MeshStandardMaterial({color:0xe0b77f,roughness:.76});
   const wallParts=[];const addWall=(geometry,x,y,z,material=wallMaterial)=>{const wall=new THREE.Mesh(geometry,material);wall.position.set(x,y,z);wall.receiveShadow=true;scene.add(wall);wallParts.push(wall);return wall};
   addWall(new THREE.BoxGeometry(12.62,5.7,.34),-8.83,2.85,13.22);addWall(new THREE.BoxGeometry(12.62,5.7,.34),8.83,2.85,13.22);addWall(new THREE.BoxGeometry(5.42,.98,.34),0,5.21,13.22);
@@ -118,7 +136,7 @@ function buildZone(ci){
 }
 
 function zoneLocalToWorld(layout,x,z){return new THREE.Vector3(layout.x+Math.cos(layout.ry)*x+Math.sin(layout.ry)*z,0,layout.z-Math.sin(layout.ry)*x+Math.cos(layout.ry)*z)}
-function loadGalleryConfig(){try{const saved=JSON.parse(localStorage.getItem('galleryConfig')||'{}'),frames=saved.frames&&typeof saved.frames==='object'?Object.fromEntries(Object.entries(saved.frames).filter(([key,value])=>/^\d-\d$/.test(key)&&FRAME_PRESETS[value])):{},theme=saved.theme==='white'?'storybook':saved.theme,savedName=typeof saved.name==='string'?saved.name.trim().slice(0,30):'';return{name:savedName&&savedName!=='우리들의 미술관'?savedName:DEFAULT_GALLERY_CONFIG.name,theme:['warm','storybook'].includes(theme)?theme:'warm',frames}}catch{return{name:DEFAULT_GALLERY_CONFIG.name,theme:'warm',frames:{}}}}
+function loadGalleryConfig(){try{const saved=JSON.parse(localStorage.getItem('galleryConfig')||'{}'),frames=saved.frames&&typeof saved.frames==='object'?Object.fromEntries(Object.entries(saved.frames).filter(([key,value])=>/^\d-\d$/.test(key)&&FRAME_PRESETS[value])):{},theme=saved.theme==='white'?'storybook':saved.theme,savedName=typeof saved.name==='string'?saved.name.trim().slice(0,30):'',childCount=Number.isInteger(Number(saved.childCount))?Math.min(CHILD_COUNT_MAX,Math.max(CHILD_COUNT_MIN,Number(saved.childCount))):DEFAULT_GALLERY_CONFIG.childCount;return{name:savedName&&savedName!=='우리들의 미술관'?savedName:DEFAULT_GALLERY_CONFIG.name,theme:['warm','storybook'].includes(theme)?theme:'warm',childCount,frames}}catch{return{name:DEFAULT_GALLERY_CONFIG.name,theme:'warm',childCount:DEFAULT_GALLERY_CONFIG.childCount,frames:{}}}}
 function saveGalleryConfig(){localStorage.setItem('galleryConfig',JSON.stringify(galleryConfig))}
 function applyGalleryName(name,persist=true){
   const clean=(name||DEFAULT_GALLERY_CONFIG.name).trim().slice(0,30)||DEFAULT_GALLERY_CONFIG.name,parts=clean.split(/\s+/),first=parts.shift(),rest=parts.join(' ');galleryConfig.name=clean;
@@ -193,19 +211,15 @@ function bind(){
   $('#music-toggle').onclick=()=>musicOn?stopAmbientMusic():startAmbientMusic();
   if($('#overview'))$('#overview').onclick=showOverview;$('#index-open').onclick=openIndex;$('#index-close').onclick=closeIndex;if(adminMode){$('#settings-open').onclick=openSettings;$('#settings-close').onclick=closeSettings}
   $$('[data-close]').forEach(b=>b.onclick=closePoem);
-  $('#prev-poem').onclick=()=>movePoem(-1);$('#next-poem').onclick=()=>movePoem(1);bindJoystick();
-}
-function bindJoystick(){
-  const values={forward:[0,-1],back:[0,1],left:[-1,0],right:[1,0]};
-  $$('[data-move]').forEach(button=>{const value=values[button.dataset.move],start=e=>{e.preventDefault();joy.x=value[0];joy.y=value[1];button.classList.add('pressed');button.setPointerCapture?.(e.pointerId)},stop=()=>{joy.x=joy.y=0;button.classList.remove('pressed')};button.addEventListener('pointerdown',start);button.addEventListener('pointerup',stop);button.addEventListener('pointercancel',stop);button.addEventListener('lostpointercapture',stop)});
+  $('#prev-poem').onclick=()=>movePoem(-1);$('#next-poem').onclick=()=>movePoem(1);
 }
 
 function animate(){
   requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);
   if(started&&!modalOpen){
     if(entryActive){updateEntrySequence(dt);updateMap()}else if(tourActive){updatePanoramaTour(dt);updateZone();updateMap()}else if(zoneTravelActive){updateZoneTravel(dt);updateMap()}else{
-      const forward=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0)-joy.y;
-      const side=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0)+joy.x;
+      const forward=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0);
+      const side=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0);
       if(forward||side){hasDestination=false;scene.userData.clickMarker.visible=false;moveTarget.set(-Math.sin(yaw)*forward+Math.cos(yaw)*side,0,-Math.cos(yaw)*forward-Math.sin(yaw)*side);if(moveTarget.lengthSq()>1)moveTarget.normalize();moveTarget.multiplyScalar(MANUAL_MOVE_SPEED)}
       else if(hasDestination){
         moveTarget.set(moveDestination.x-camera.position.x,0,moveDestination.z-camera.position.z);const distance=moveTarget.length();
@@ -226,7 +240,7 @@ function animate(){
 function updateCurator(dt,now){
   const curator=scene.userData.curator,shadow=scene.userData.curatorShadow;if(!curator)return;
   const hidden=!started||entryActive||tourActive;curator.visible=!hidden;if(shadow)shadow.visible=!hidden;if(hidden)return;
-  const activeLayout=activeChildZone>=0?ZONE_LAYOUT[activeChildZone]:null,activeDistanceSq=activeLayout?(camera.position.x-activeLayout.x)**2+(camera.position.z-activeLayout.z)**2:Infinity,anchoredToZone=!!activeLayout&&activeDistanceSq<64,movingWithCamera=zoneTravelActive||hasDestination||dragging||moveVelocity.lengthSq()>.01||!!(joy.x||joy.y||keys.w||keys.a||keys.s||keys.d||keys.arrowup||keys.arrowdown||keys.arrowleft||keys.arrowright),rightX=Math.cos(yaw),rightZ=-Math.sin(yaw),forwardX=-Math.sin(yaw),forwardZ=-Math.cos(yaw);
+  const activeLayout=activeChildZone>=0?ZONE_LAYOUT[activeChildZone]:null,activeDistanceSq=activeLayout?(camera.position.x-activeLayout.x)**2+(camera.position.z-activeLayout.z)**2:Infinity,anchoredToZone=!!activeLayout&&activeDistanceSq<64,movingWithCamera=zoneTravelActive||hasDestination||dragging||moveVelocity.lengthSq()>.01||!!(keys.w||keys.a||keys.s||keys.d||keys.arrowup||keys.arrowdown||keys.arrowleft||keys.arrowright),rightX=Math.cos(yaw),rightZ=-Math.sin(yaw),forwardX=-Math.sin(yaw),forwardZ=-Math.cos(yaw);
   if(movingWithCamera){const followDistance=anchoredToZone?2.35:3;curatorTarget.set(camera.position.x-Math.sin(yaw)*followDistance,anchoredToZone?.79:.96,camera.position.z-Math.cos(yaw)*followDistance)}
   else if(anchoredToZone){const focused=camera.userData.focus?.userData?.child===activeChildZone?camera.userData.focus:lastFocusedArtwork?.userData?.child===activeChildZone?lastFocusedArtwork:null;let side=activeChildZone%2?-1:1;if(focused){focused.getWorldPosition(curatorArtworkPoint).project(camera);if(Math.abs(curatorArtworkPoint.x)>.12)side=curatorArtworkPoint.x<0?1:-1;else if(focused.userData.poem!==2)side=focused.userData.poem<2?1:-1}const forwardDistance=coarsePointer?2.65:2.5,sideDistance=coarsePointer?.22:1.45;curatorTarget.set(camera.position.x+forwardX*forwardDistance+rightX*side*sideDistance,.79,camera.position.z+forwardZ*forwardDistance+rightZ*side*sideDistance)}
   else curatorTarget.set(camera.position.x-Math.sin(yaw)*3,.96,camera.position.z-Math.cos(yaw)*3);
@@ -252,7 +266,7 @@ function updateMusicButton(){const b=$('#music-toggle');if(!b)return;b.classList
 function updateZone(){
   if(Math.abs(camera.position.x)<5.2&&Math.abs(camera.position.z)<5.2){activeChildZone=-1;$('#zone-name').textContent='중앙 햇살 통로';return}
   if(activeChildZone>=0){const zone=ZONE_LAYOUT[activeChildZone],d=(camera.position.x-zone.x)**2+(camera.position.z-zone.z)**2;if(d<64){$('#zone-name').textContent=`${children[activeChildZone].name}의 방`;return}}
-  let nearest=0,best=Infinity;ZONE_LAYOUT.forEach((zone,i)=>{const d=(camera.position.x-zone.x)**2+(camera.position.z-zone.z)**2;if(d<best){best=d;nearest=i}});activeChildZone=nearest;$('#zone-name').textContent=`${children[nearest].name}의 방`;
+  let nearest=0,best=Infinity;ZONE_LAYOUT.slice(0,children.length).forEach((zone,i)=>{const d=(camera.position.x-zone.x)**2+(camera.position.z-zone.z)**2;if(d<best){best=d;nearest=i}});activeChildZone=nearest;$('#zone-name').textContent=`${children[nearest].name}의 방`;
 }
 function updateFocus(){
   raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
@@ -290,10 +304,10 @@ function hideEntryPortal(immediate=false){
   const portal=$('#entry-portal');clearTimeout(entryPortalOpenTimer);clearTimeout(entryPortalHideTimer);entryPortalOpenTimer=entryPortalHideTimer=null;if(!portal)return;portal.classList.remove('active');if(immediate)portal.classList.remove('open');else setTimeout(()=>portal.classList.remove('open'),420)
 }
 function startEntrySequence(){
-  activeChildZone=-1;hasDestination=false;tourActive=false;zoneTravelActive=false;entryActive=true;entryElapsed=0;moveVelocity.set(0,0,0);$('#hud').classList.add('cinematic');(scene.userData.doors||[]).forEach(door=>{door.rotation.y=0;door.visible=false});if(scene.userData.entranceFacade)scene.userData.entranceFacade.visible=false;(scene.userData.entranceWalls||[]).forEach(wall=>wall.visible=false);camera.position.set(0,1.68,16.5);yaw=0;pitch=0;camera.fov=68;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='전시장 입구'
+  activeChildZone=-1;hasDestination=false;tourActive=false;zoneTravelActive=false;entryActive=true;entryElapsed=0;moveVelocity.set(0,0,0);$('#hud').classList.add('cinematic');(scene.userData.doors||[]).forEach(door=>{door.rotation.y=0;door.visible=true});if(scene.userData.entranceFacade)scene.userData.entranceFacade.visible=true;(scene.userData.entranceWalls||[]).forEach(wall=>wall.visible=true);camera.position.set(0,1.68,16.5);yaw=0;pitch=0;camera.fov=68;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='전시장 입구'
 }
 function updateEntrySequence(dt){
-  entryElapsed=Math.min(ENTRY_DURATION,entryElapsed+dt);const t=entryElapsed/ENTRY_DURATION,doorT=THREE.MathUtils.smoothstep(THREE.MathUtils.clamp((t-.14)/.43,0,1),0,1),walkT=THREE.MathUtils.smoothstep(THREE.MathUtils.clamp((t-.57)/.43,0,1),0,1),doors=scene.userData.doors||[];if(doors[0])doors[0].rotation.y=-doorT*1.08;if(doors[1])doors[1].rotation.y=doorT*1.08;camera.position.z=THREE.MathUtils.lerp(16.5,11.2,walkT);doors.forEach(door=>door.visible=false);camera.position.y=1.68+Math.sin(walkT*Math.PI)*.035;camera.rotation.set(0,0,0);if(t>=1){entryActive=false;$('#hud').classList.remove('cinematic');camera.fov=72;camera.updateProjectionMatrix();startPanoramaTour()}
+  entryElapsed=Math.min(ENTRY_DURATION,entryElapsed+dt);const t=entryElapsed/ENTRY_DURATION,doorT=THREE.MathUtils.smoothstep(THREE.MathUtils.clamp((t-.08)/.34,0,1),0,1),walkT=THREE.MathUtils.smoothstep(THREE.MathUtils.clamp((t-.42)/.58,0,1),0,1),doors=scene.userData.doors||[];if(doors[0])doors[0].rotation.y=-doorT*1.25;if(doors[1])doors[1].rotation.y=doorT*1.25;doors.forEach(door=>door.visible=true);camera.position.z=THREE.MathUtils.lerp(16.5,11.2,walkT);camera.position.y=1.68+Math.sin(walkT*Math.PI)*.025;camera.fov=THREE.MathUtils.lerp(68,72,walkT);camera.updateProjectionMatrix();camera.rotation.set(0,0,0);if(t>=1){entryActive=false;$('#hud').classList.remove('cinematic');camera.position.set(0,1.68,11.2);camera.fov=72;camera.updateProjectionMatrix();startPanoramaTour()}
 }
 function startPanoramaTour(){
   hasDestination=false;moveVelocity.set(0,0,0);tourElapsed=0;tourActive=!reduceMotion;camera.fov=74;camera.updateProjectionMatrix();camera.position.set(0,2.05,11.2);yaw=0;pitch=-.025;camera.rotation.set(pitch,yaw,0);if(reduceMotion)finishPanoramaTour()
@@ -353,6 +367,8 @@ function showPoemScan(ci,pi){
 }
 function buildSettings(){
   $('#gallery-name').value=galleryConfig.name;const applyName=()=>{applyGalleryName($('#gallery-name').value);setScanStatus('전시장 이름을 바꿨어요.')};$('#gallery-name-apply').onclick=applyName;$('#gallery-name').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();applyName()}};$$('[data-theme-choice]').forEach(button=>button.onclick=()=>{applyGalleryTheme(button.dataset.themeChoice);setScanStatus(`${button.querySelector('strong').textContent} 배경으로 바꿨어요.`)});
+  const childCountInput=$('#child-count');childCountInput.value=galleryConfig.childCount;$('#child-count-apply').onclick=()=>{const count=Math.min(CHILD_COUNT_MAX,Math.max(CHILD_COUNT_MIN,Math.round(Number(childCountInput.value)||galleryConfig.childCount)));childCountInput.value=count;if(count===galleryConfig.childCount){setScanStatus(`현재 어린이 수는 ${count}명입니다.`);return}galleryConfig.childCount=count;saveGalleryConfig();setScanStatus(`어린이 수를 ${count}명으로 바꿨어요. 전시 공간을 다시 구성합니다.`);setTimeout(()=>location.reload(),650)};
+  $('#admin-password-change').onclick=async()=>{const current=$('#current-admin-password'),next=$('#new-admin-password'),confirm=$('#confirm-admin-password'),status=$('#password-change-status'),button=$('#admin-password-change');status.classList.remove('error');status.textContent='';if(!(await verifyAdminPassword(current.value))){status.textContent='현재 비밀번호가 맞지 않습니다.';status.classList.add('error');current.focus();return}if(next.value.length<6){status.textContent='새 비밀번호를 6자 이상 입력해 주세요.';status.classList.add('error');next.focus();return}if(next.value!==confirm.value){status.textContent='새 비밀번호 확인이 일치하지 않습니다.';status.classList.add('error');confirm.focus();return}button.disabled=true;button.textContent='변경 중';try{const credential=await createAdminCredential(next.value);localStorage.setItem(ADMIN_CREDENTIAL_KEY,JSON.stringify(credential));sessionStorage.setItem(ADMIN_SESSION_KEY,credential.hash);current.value=next.value=confirm.value='';status.textContent='관리자 비밀번호를 변경했습니다.'}catch{status.textContent='비밀번호를 변경하지 못했습니다.';status.classList.add('error')}finally{button.disabled=false;button.textContent='비밀번호 변경'}};
   const frameOptions=Object.entries(FRAME_PRESETS).map(([value,preset])=>`<option value="${value}">${preset.label}</option>`).join(''),root=$('#settings-list');children.forEach((child,ci)=>{const section=document.createElement('section');section.className='scan-child';section.innerHTML=`<h3><i style="--c:${child.color}"></i>${child.name}<span>작품 5점</span></h3><div class="scan-grid">${child.poems.map((_,pi)=>{const key=`${ci}-${pi}`,preset=galleryConfig.frames[key]||'portrait';return `<article class="scan-slot" data-scan-slot="${key}"><div><strong>작품 ${pi+1}</strong><span class="scan-file-name">원본 없음</span></div><label class="frame-field"><span>액자 형태</span><select data-frame-select="${key}">${frameOptions}</select></label><div class="scan-actions"><label>원본 선택<input type="file" accept="image/png,image/jpeg,image/webp" data-scan-input="${key}"></label><button type="button" data-scan-remove="${key}" hidden>삭제</button></div></article>`}).join('')}</div>`;root.append(section);child.poems.forEach((_,pi)=>{const key=`${ci}-${pi}`;root.querySelector(`[data-frame-select="${key}"]`).value=galleryConfig.frames[key]||'portrait'})});
   $$('[data-frame-select]').forEach(select=>select.onchange=async()=>{const key=select.dataset.frameSelect,preset=select.value;setScanStatus('액자 크기와 배치를 바꾸고 있어요.');await applyFramePreset(key,preset);setScanStatus(`${FRAME_PRESETS[preset].label} 액자로 바꿨어요.`)});
   $$('[data-scan-input]').forEach(input=>input.onchange=async()=>{const file=input.files?.[0],key=input.dataset.scanInput;input.value='';if(!file)return;const [ci,pi]=key.split('-').map(Number);try{setScanStatus(`${children[ci].name}의 ${pi+1}번째 원본을 준비하고 있어요.`);const record=await createScanRecord(key,ci,pi,file);await putScanRecord(record);scanRecords.set(key,record);applyScanTexture(record);updateScanSlot(record);if(selectedChild===ci&&selectedPoem===pi&&$('#poem-modal').classList.contains('open'))showPoemScan(ci,pi);setScanStatus(`${children[ci].name}의 ${pi+1}번째 원본을 저장했어요.`)}catch(error){setScanStatus(error?.message||'원본 파일을 저장하지 못했어요.',true)}});
