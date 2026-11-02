@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=63">
+  <link rel="stylesheet" href="styles.css?v=67">
 </head>
 <body data-admin="true" class="admin-mode">
   <a class="skip" href="#settings-panel">3D 전시를 건너뛰고 설정 열기</a>
@@ -83,7 +83,7 @@
     <section class="gallery-config" aria-labelledby="gallery-config-title">
       <h3 id="gallery-config-title">전시장 기본 설정</h3>
       <label class="name-field" for="gallery-name"><span>전시장 이름</span><div class="name-control"><input id="gallery-name" type="text" maxlength="30" autocomplete="off"><button id="gallery-name-apply" type="button">이름 적용</button></div></label>
-      <label class="child-count-field" for="child-count"><span>참여 어린이 수</span><div class="child-count-control"><input id="child-count" type="number" min="1" max="10" step="1" inputmode="numeric"><button id="child-count-apply" type="button">인원 적용</button></div><small>1명부터 10명까지 설정할 수 있으며, 적용하면 전시 구역과 작품 목록이 함께 바뀝니다.</small></label>
+      <label class="child-count-field" for="child-count"><span>참여 어린이 수</span><div class="child-count-control"><input id="child-count" type="number" min="1" max="12" step="1" inputmode="numeric"><button id="child-count-apply" type="button">인원 적용</button></div><small>기본 10명이며, 1명부터 12명까지 설정할 수 있습니다. 적용하면 전시 구역과 작품 목록이 함께 바뀝니다.</small></label>
       <fieldset class="theme-field"><legend>전시장 배경</legend><div class="theme-options"><button type="button" data-theme-choice="warm" aria-pressed="false"><i class="theme-preview warm" aria-hidden="true"></i><strong>따뜻한 원목</strong><span>햇살과 밝은 마루</span></button><button type="button" data-theme-choice="storybook" aria-pressed="false"><i class="theme-preview storybook" aria-hidden="true"></i><strong>그림책 원화전</strong><span>크림 벽과 파스텔 전시</span></button></div></fieldset>
       <p>두 배경 모두 실제 문을 열고 입장합니다. 그림책 원화전 배경은 크림색 종이 벽, 파스텔 전시 면, 낮은 원목 진열대와 부드러운 조명을 사용합니다.</p>
     </section>
@@ -98,6 +98,6 @@
     <div id="settings-list" class="settings-list"></div>
   </aside>
 
-  <script type="module" src="app.js?v=63"></script>
+  <script type="module" src="app.js?v=67"></script>
 </body>
 </html>
