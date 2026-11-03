@@ -41,7 +41,7 @@ const groundPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0),groundHitPoint=new
 const BACK_ZONE_SLOTS=[{x:-10.05,z:-13.15,ry:0},{x:-3.35,z:-13.15,ry:0},{x:3.35,z:-13.15,ry:0},{x:10.05,z:-13.15,ry:0}];
 const LEFT_ZONE_SLOTS=[{x:-15,z:-10.05,ry:Math.PI/2},{x:-15,z:-3.35,ry:Math.PI/2},{x:-15,z:3.35,ry:Math.PI/2},{x:-15,z:10.05,ry:Math.PI/2}];
 const RIGHT_ZONE_SLOTS=[{x:15,z:-10.05,ry:-Math.PI/2},{x:15,z:-3.35,ry:-Math.PI/2},{x:15,z:3.35,ry:-Math.PI/2},{x:15,z:10.05,ry:-Math.PI/2}];
-function selectBalancedSlots(slots,count){if(count<=0)return[];if(count===1)return[slots[Math.floor(slots.length/2)]];return Array.from({length:count},(_,i)=>slots[Math.round(i*(slots.length-1)/(count-1))])}
+function selectBalancedSlots(slots,count){if(count<=0)return[];if(count>=slots.length)return slots.slice(0,count);const centerIndex=(slots.length-1)/2,startIndex=centerIndex-(count-1)/2;return Array.from({length:count},(_,i)=>{const index=startIndex+i,lower=Math.floor(index),upper=Math.ceil(index),mix=index-lower,a=slots[lower],b=slots[upper];return{x:THREE.MathUtils.lerp(a.x,b.x,mix),z:THREE.MathUtils.lerp(a.z,b.z,mix),ry:THREE.MathUtils.lerp(a.ry,b.ry,mix)}})}
 function createZoneLayout(count){const backCount=Math.min(4,Math.ceil(count/3)),remaining=count-backCount,leftCount=Math.ceil(remaining/2),rightCount=Math.floor(remaining/2);return[...selectBalancedSlots(BACK_ZONE_SLOTS,backCount),...selectBalancedSlots(LEFT_ZONE_SLOTS,leftCount),...selectBalancedSlots(RIGHT_ZONE_SLOTS,rightCount)]}
 const ZONE_LAYOUT=createZoneLayout(children.length);
 const visited=new Set(JSON.parse(localStorage.getItem('galleryVisited')||'[]'));
