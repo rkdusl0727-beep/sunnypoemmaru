@@ -46,7 +46,7 @@ function createZoneLayout(count){const backCount=Math.min(4,Math.ceil(count/3)),
 const ZONE_LAYOUT=createZoneLayout(children.length);
 const visited=new Set(JSON.parse(localStorage.getItem('galleryVisited')||'[]'));
 const poemPngTextures=new Map();
-const poemArtMeshes=new Map(),frameGroups=new Map(),zoneFrameGroups=new Map(),scanRecords=new Map();
+const poemArtMeshes=new Map(),frameGroups=new Map(),messageCardMeshes=new Map(),zoneFrameGroups=new Map(),scanRecords=new Map();
 const SCAN_DB_NAME='sunny-poem-original-scans',SCAN_STORE='scans';
 let scanDbPromise=null,activeScanUrl=null;
 const FRAME_PRESETS={
@@ -70,7 +70,7 @@ async function init(){
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.18;
   renderer.shadowMap.enabled=!coarsePointer;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   clock=new THREE.Clock();raycaster=new THREE.Raycaster();
-  buildGallery();bind();buildIndex();if(adminMode)buildSettings();validateGalleryIntegrity();bindGuideAudioEvents();preloadGuideAudio().catch(()=>{});applyGalleryName(galleryConfig.name,false);applyGalleryTheme(galleryConfig.theme,false);loadStoredScans();if(renderer.shadowMap.enabled){renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true}animate();
+  buildGallery();bind();buildIndex();if(adminMode)buildSettings();refreshCheerCards();validateGalleryIntegrity();bindGuideAudioEvents();preloadGuideAudio().catch(()=>{});applyGalleryName(galleryConfig.name,false);applyGalleryTheme(galleryConfig.theme,false);loadStoredScans();if(renderer.shadowMap.enabled){renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true}animate();
   setTimeout(()=>$('#loading').classList.add('done'),450);
 }
 
@@ -140,7 +140,9 @@ function buildZone(ci){
     const key=`${ci}-${pi}`,preset=galleryConfig.frames[key]||'portrait',framedArt=new THREE.Group();framedArt.position.z=.22;
     const frameBody=new THREE.Mesh(new THREE.BoxGeometry(1,1,.16),scene.userData.frameSideMaterial);frameBody.castShadow=renderer.shadowMap.enabled;framedArt.add(frameBody);
     const art=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshStandardMaterial({map:makePoemPngTexture(ci,pi,preset),roughness:.48,emissive:new THREE.Color(c.color),emissiveIntensity:.045,side:THREE.DoubleSide}));art.position.z=.086;art.userData={type:'poem',child:ci,poem:pi};frameMeshes.push(art);poemArtMeshes.set(key,art);framedArt.add(art);
-    const frame=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:scene.userData.frameTexture,transparent:true,alphaTest:.035,depthWrite:false,toneMapped:true,side:THREE.DoubleSide}));frame.position.z=.098;frame.renderOrder=2;framedArt.add(frame);framedArt.userData={key,ci,pi,preset,frameBody,art,frame};frameGroups.set(key,framedArt);groups.push(framedArt);zone.add(framedArt);setFrameGeometry(framedArt,preset);
+    const frame=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:scene.userData.frameTexture,transparent:true,alphaTest:.035,depthWrite:false,toneMapped:true,side:THREE.DoubleSide}));frame.position.z=.098;frame.renderOrder=2;framedArt.add(frame);
+    const messageCard=new THREE.Mesh(new THREE.PlaneGeometry(1,.36),new THREE.MeshBasicMaterial({transparent:true,depthWrite:false,toneMapped:false,side:THREE.DoubleSide}));messageCard.position.z=.11;messageCard.renderOrder=3;messageCard.visible=false;messageCard.userData={type:'poem',child:ci,poem:pi,cheerCard:true};framedArt.add(messageCard);frameMeshes.push(messageCard);messageCardMeshes.set(key,messageCard);
+    framedArt.userData={key,ci,pi,preset,frameBody,art,frame,messageCard};frameGroups.set(key,framedArt);groups.push(framedArt);zone.add(framedArt);setFrameGeometry(framedArt,preset);
   });zoneFrameGroups.set(ci,groups);layoutZoneFrames(ci);
   const glowPos=zoneLocalToWorld(layout,0,2.2);const zoneGlow=new THREE.PointLight(c.color,.38,6,2);zoneGlow.position.set(glowPos.x,3.6,glowPos.z);scene.add(zoneGlow);
   const plantPos=zoneLocalToWorld(layout,2.95,1.05);buildPlant(plantPos.x,plantPos.z);
@@ -160,8 +162,8 @@ function applyGalleryTheme(theme,persist=true){
   $$('[data-theme-choice]').forEach(button=>{const active=button.dataset.themeChoice===selected;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active))});if(renderer.shadowMap.enabled)renderer.shadowMap.needsUpdate=true;if(persist)saveGalleryConfig()
 }
 function setFrameGeometry(group,presetName){
-  const preset=FRAME_PRESETS[presetName]||FRAME_PRESETS.portrait,artW=Math.max(.54,preset.w-.18),artH=Math.max(.52,preset.h-.24),{frameBody,art,frame}=group.userData;
-  frameBody.geometry.dispose();frameBody.geometry=new THREE.BoxGeometry(preset.w,preset.h,.16);art.geometry.dispose();art.geometry=new THREE.PlaneGeometry(artW,artH);frame.geometry.dispose();frame.geometry=new THREE.PlaneGeometry(preset.w+.02,preset.h+.02);group.userData.preset=presetName
+  const preset=FRAME_PRESETS[presetName]||FRAME_PRESETS.portrait,artW=Math.max(.54,preset.w-.18),artH=Math.max(.52,preset.h-.24),{frameBody,art,frame,messageCard}=group.userData;
+  frameBody.geometry.dispose();frameBody.geometry=new THREE.BoxGeometry(preset.w,preset.h,.16);art.geometry.dispose();art.geometry=new THREE.PlaneGeometry(artW,artH);frame.geometry.dispose();frame.geometry=new THREE.PlaneGeometry(preset.w+.02,preset.h+.02);if(messageCard){messageCard.geometry.dispose();messageCard.geometry=new THREE.PlaneGeometry(Math.min(1.02,Math.max(.72,preset.w-.08)),.38);messageCard.position.y=-preset.h/2-.27}group.userData.preset=presetName
 }
 function layoutZoneFrames(ci){
   const groups=zoneFrameGroups.get(ci)||[],gap=.12,width=g=>FRAME_PRESETS[g.userData.preset]?.w||1.06,total=groups.reduce((sum,g)=>sum+width(g),0)+gap*Math.max(0,groups.length-1),placeRow=(row,y)=>{const rowWidth=row.reduce((sum,g)=>sum+width(g),0)+gap*Math.max(0,row.length-1);let x=-rowWidth/2;row.forEach(g=>{const w=width(g);g.position.x=x+w/2;g.position.y=y;x+=w+gap})};
@@ -224,6 +226,7 @@ function bind(){
   if($('#cheer-toggle'))$('#cheer-toggle').onclick=toggleCheerForm;
   if($('#cheer-message'))$('#cheer-message').oninput=()=>{$('#cheer-length').textContent=String($('#cheer-message').value.length)};
   if($('#cheer-form')&&!adminMode)$('#cheer-form').onsubmit=submitCheerMessage;
+  addEventListener('storage',event=>{if(event.key!==CHEER_STORAGE_KEY)return;refreshCheerCards();renderCheerSection(selectedChild,selectedPoem);renderCheerAdmin()});
   if($('#overview'))$('#overview').onclick=showOverview;$('#index-open').onclick=openIndex;$('#index-close').onclick=closeIndex;if(adminMode){$('#settings-open').onclick=openSettings;$('#settings-close').onclick=closeSettings}
   $$('[data-close]').forEach(b=>b.onclick=closePoem);
   $('#prev-poem').onclick=()=>movePoem(-1);$('#next-poem').onclick=()=>movePoem(1);
@@ -359,8 +362,16 @@ function closeIndex(){modalOpen=false;$('#index-panel').classList.remove('open')
 function openSettings(){if(!adminMode)return;closeIndex();closePoem();modalOpen=true;$('#settings-panel').classList.add('open');$('#settings-panel').setAttribute('aria-hidden','false');setTimeout(()=>$('#settings-close').focus(),220)}
 function closeSettings(){if(!adminMode)return;modalOpen=false;$('#settings-panel').classList.remove('open');$('#settings-panel').setAttribute('aria-hidden','true')}
 function readCheerMessages(){try{const stored=JSON.parse(localStorage.getItem(CHEER_STORAGE_KEY)||'[]');if(!Array.isArray(stored))return[];return stored.filter(item=>item&&typeof item==='object'&&Number.isInteger(item.ci)&&Number.isInteger(item.pi)&&item.ci>=0&&item.ci<CHILD_COUNT_MAX&&item.pi>=0&&item.pi<POEMS_PER_CHILD&&typeof item.author==='string'&&typeof item.message==='string').map(item=>({id:String(item.id||''),ci:item.ci,pi:item.pi,author:item.author.trim().slice(0,12),message:item.message.trim().slice(0,CHEER_MAX_LENGTH),status:['approved','hidden'].includes(item.status)?item.status:'pending',createdAt:Number(item.createdAt)||Date.now()})).filter(item=>item.id&&item.author&&item.message)}catch{return[]}}
-function saveCheerMessages(messages){localStorage.setItem(CHEER_STORAGE_KEY,JSON.stringify(messages.slice(-500)))}
+function saveCheerMessages(messages){localStorage.setItem(CHEER_STORAGE_KEY,JSON.stringify(messages.slice(-500)));if(scene)refreshCheerCards()}
 function cheerDate(timestamp){try{return new Intl.DateTimeFormat('ko-KR',{month:'long',day:'numeric'}).format(new Date(timestamp))}catch{return''}}
+function roundedRect(context,x,y,width,height,radius){const r=Math.min(radius,width/2,height/2);context.beginPath();context.moveTo(x+r,y);context.arcTo(x+width,y,x+width,y+height,r);context.arcTo(x+width,y+height,x,y+height,r);context.arcTo(x,y+height,x,y,r);context.arcTo(x,y,x+width,y,r);context.closePath()}
+function cheerLines(context,text,maxWidth,maxLines=2){const chars=[...text],lines=[];let line='';for(const char of chars){const next=line+char;if(context.measureText(next).width>maxWidth&&line){lines.push(line);line=char;if(lines.length===maxLines-1)break}else line=next}const consumed=lines.join('').length;if(lines.length===maxLines-1&&consumed<chars.length){let tail=chars.slice(consumed).join('');while(context.measureText(`${tail}…`).width>maxWidth&&tail.length)tail=tail.slice(0,-1);lines.push(`${tail}…`)}else if(line)lines.push(line);return lines.slice(0,maxLines)}
+function makeCheerCardTexture(item,total,color){
+  const canvas=document.createElement('canvas');canvas.width=768;canvas.height=288;const context=canvas.getContext('2d');context.clearRect(0,0,canvas.width,canvas.height);context.shadowColor='#5a3b2226';context.shadowBlur=20;context.shadowOffsetY=9;roundedRect(context,22,18,724,244,28);context.fillStyle='#fffaf0';context.fill();context.shadowColor='transparent';context.lineWidth=5;context.strokeStyle=color;context.stroke();context.fillStyle='#8a674c';context.font='700 25px Gowun Dodum, sans-serif';context.fillText('따뜻한 응원',55,63);if(total>1){context.font='700 22px Gowun Dodum, sans-serif';const label=`+${total-1}`,labelWidth=context.measureText(label).width+30;roundedRect(context,714-labelWidth,36,labelWidth,42,21);context.fillStyle='#f3dfbd';context.fill();context.fillStyle='#765338';context.textAlign='center';context.fillText(label,714-labelWidth/2,65);context.textAlign='left'}context.fillStyle='#4f3b2d';context.font='700 34px Gowun Dodum, sans-serif';cheerLines(context,item.message,660,2).forEach((line,index)=>context.fillText(line,55,122+index*47));context.fillStyle='#9a7960';context.font='24px Gowun Dodum, sans-serif';context.fillText(item.author,55,238);const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.minFilter=THREE.LinearFilter;texture.magFilter=THREE.LinearFilter;return texture
+}
+function refreshCheerCards(){
+  if(!messageCardMeshes.size)return;const approved=new Map();readCheerMessages().filter(item=>item.status==='approved').sort((a,b)=>b.createdAt-a.createdAt).forEach(item=>{const key=`${item.ci}-${item.pi}`;if(!approved.has(key))approved.set(key,[]);approved.get(key).push(item)});messageCardMeshes.forEach((mesh,key)=>{const items=approved.get(key)||[],oldTexture=mesh.material.map;if(!items.length){mesh.visible=false;mesh.material.map=null;mesh.material.needsUpdate=true;if(oldTexture?.userData?.cheerCard)oldTexture.dispose();return}const [ci]=key.split('-').map(Number),texture=makeCheerCardTexture(items[0],items.length,children[ci]?.color||'#e5b566');texture.userData.cheerCard=true;mesh.material.map=texture;mesh.material.opacity=1;mesh.material.needsUpdate=true;mesh.visible=true;if(oldTexture?.userData?.cheerCard)oldTexture.dispose()})
+}
 function collapseCheerForm(){const form=$('#cheer-form'),toggle=$('#cheer-toggle');if(!form||!toggle)return;form.hidden=true;toggle.setAttribute('aria-expanded','false');toggle.textContent='응원 남기기';if($('#cheer-status'))$('#cheer-status').textContent='';if($('#cheer-length'))$('#cheer-length').textContent=String($('#cheer-message')?.value.length||0)}
 function toggleCheerForm(){if(adminMode)return;const form=$('#cheer-form'),toggle=$('#cheer-toggle'),opening=form.hidden;form.hidden=!opening;toggle.setAttribute('aria-expanded',String(opening));toggle.textContent=opening?'응원 작성 접기':'응원 남기기';if(opening)setTimeout(()=>$('#cheer-author').focus(),60)}
 function renderCheerSection(ci,pi){
@@ -402,7 +413,7 @@ function buildSettings(){
   $$('[data-frame-select]').forEach(select=>select.onchange=async()=>{const key=select.dataset.frameSelect,preset=select.value;setScanStatus('액자 크기와 배치를 바꾸고 있어요.');await applyFramePreset(key,preset);setScanStatus(`${FRAME_PRESETS[preset].label} 액자로 바꿨어요.`)});
   $$('[data-scan-input]').forEach(input=>input.onchange=async()=>{const file=input.files?.[0],key=input.dataset.scanInput;input.value='';if(!file)return;const [ci,pi]=key.split('-').map(Number);try{setScanStatus(`${children[ci].name}의 ${pi+1}번째 원본을 준비하고 있어요.`);const record=await createScanRecord(key,ci,pi,file);await putScanRecord(record);scanRecords.set(key,record);applyScanTexture(record);updateScanSlot(record);if(selectedChild===ci&&selectedPoem===pi&&$('#poem-modal').classList.contains('open'))showPoemScan(ci,pi);setScanStatus(`${children[ci].name}의 ${pi+1}번째 원본을 저장했어요.`)}catch(error){setScanStatus(error?.message||'원본 파일을 저장하지 못했어요.',true)}});
   $$('[data-scan-remove]').forEach(button=>button.onclick=async()=>{const key=button.dataset.scanRemove,[ci,pi]=key.split('-').map(Number);try{await deleteScanRecord(key);scanRecords.delete(key);restorePlaceholderTexture(ci,pi);updateScanSlot({key,name:''});if(selectedChild===ci&&selectedPoem===pi&&$('#poem-modal').classList.contains('open'))showPoemScan(ci,pi);setScanStatus(`${children[ci].name}의 ${pi+1}번째 원본을 삭제했어요.`)}catch{setScanStatus('원본을 삭제하지 못했어요.',true)}})
-  renderCheerAdmin();addEventListener('storage',event=>{if(event.key===CHEER_STORAGE_KEY)renderCheerAdmin()})
+  renderCheerAdmin()
 }
 function setScanStatus(message,isError=false){const status=$('#scan-status');if(!status)return;status.textContent=message;status.classList.toggle('error',isError)}
 function openScanDb(){
