@@ -222,7 +222,7 @@ function bind(){
   canvas.addEventListener('wheel',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;e.preventDefault();if(e.shiftKey){pitch=THREE.MathUtils.clamp(pitch-e.deltaY*.0007,PITCH_MIN,PITCH_MAX);camera.rotation.x=pitch;return}const distance=THREE.MathUtils.clamp(-e.deltaY*.01,-1.4,1.4);if(Math.abs(distance)>.03)queueDirectionalMove(distance)},{passive:false});
   $('#enter').onclick=()=>{started=true;primeGuideAudio();showEntryPortal();$('#intro').classList.add('closed');$('#hud').hidden=false;startAmbientMusic();startEntrySequence()};
   $('#home').onclick=()=>{hideEntryPortal(true);$('#intro').classList.remove('closed');$('#hud').hidden=true;$('#hud').classList.remove('cinematic');started=false;tourActive=false;entryActive=false;zoneTravelActive=false;hasDestination=false;if($('#guide-replay'))$('#guide-replay').hidden=true;resetEntrance();stopAmbientMusic();stopGuideVoice()};
-  $('#music-toggle').onclick=()=>musicOn?stopAmbientMusic():startAmbientMusic();
+  if($('#music-toggle'))$('#music-toggle').onclick=()=>musicOn?stopAmbientMusic():startAmbientMusic();
   if($('#guide-replay'))$('#guide-replay').onclick=replayCuratorGuide;
   if($('#cheer-toggle'))$('#cheer-toggle').onclick=toggleCheerForm;
   if($('#cheer-message'))$('#cheer-message').oninput=()=>{$('#cheer-length').textContent=String($('#cheer-message').value.length)};
