@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=68">
+  <link rel="stylesheet" href="styles.css?v=69">
 </head>
 <body data-admin="true" class="admin-mode">
   <a class="skip" href="#settings-panel">3D 전시를 건너뛰고 설정 열기</a>
@@ -68,6 +68,12 @@
         <img id="poem-scan" class="poem-scan" alt="" hidden>
         <div id="poem-scan-empty" class="poem-scan-empty"><strong>작품 원본 준비 중</strong><p>관리자 설정에서 스캔 이미지를 등록하면<br>아이의 작품 원본이 그대로 표시됩니다.</p></div>
       </div>
+      <section class="cheer-section" aria-labelledby="cheer-title">
+        <div class="cheer-heading"><div><small>작품에 전하는 한마디</small><h3 id="cheer-title">따뜻한 응원</h3></div><span id="cheer-count">응원 0개</span></div>
+        <div id="cheer-list" class="cheer-list"></div>
+        <button id="cheer-toggle" class="cheer-toggle" type="button" aria-expanded="false">응원 남기기</button>
+        <form id="cheer-form" class="cheer-form" hidden><label><span>보내는 분</span><input id="cheer-author" type="text" maxlength="12"></label><label><span>응원 한마디</span><textarea id="cheer-message" maxlength="100" rows="3"></textarea></label><div class="cheer-form-bottom"><small><span id="cheer-length">0</span>/100</small><button type="submit">응원 보내기</button></div><p id="cheer-status" role="status" aria-live="polite"></p></form>
+      </section>
       <footer><button id="prev-poem" type="button"><img class="nav-arrow" src="assets/ui-arrow-left.png" alt="" aria-hidden="true">이전 작품</button><button id="next-poem" type="button">다음 작품<img class="nav-arrow" src="assets/ui-arrow-right.png" alt="" aria-hidden="true"></button></footer>
     </article>
   </section>
@@ -93,11 +99,17 @@
       <button id="admin-password-change" type="button">비밀번호 변경</button>
       <p id="password-change-status" role="status" aria-live="polite"></p>
     </section>
+    <section class="cheer-admin" aria-labelledby="cheer-admin-title">
+      <div class="cheer-admin-heading"><div><small>보호자·관람객 메시지</small><h3 id="cheer-admin-title">응원 메시지 관리</h3></div><span id="cheer-pending-count">대기 0개</span></div>
+      <p>확인한 응원만 사용자 화면에 공개됩니다. 아이의 개인정보가 포함된 문구는 공개하지 말고 삭제해 주세요.</p>
+      <p class="cheer-storage-hint">현재 미리보기에서는 이 브라우저에 저장됩니다. 여러 보호자의 글을 함께 받으려면 배포 단계에서 공유 데이터베이스를 연결해야 합니다.</p>
+      <div id="cheer-admin-list" class="cheer-admin-list"></div>
+    </section>
     <p class="settings-note">아이별 작품 5점의 원본 이미지를 넣고, 각 작품에 맞는 액자 방향과 크기를 선택하세요. PNG·JPG 파일 전체가 잘리지 않게 표시됩니다.</p>
     <div id="scan-status" class="scan-status" role="status" aria-live="polite"></div>
     <div id="settings-list" class="settings-list"></div>
   </aside>
 
-  <script type="module" src="app.js?v=68"></script>
+  <script type="module" src="app.js?v=69"></script>
 </body>
 </html>
