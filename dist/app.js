@@ -33,6 +33,10 @@ const TOUR_DURATION=10;
 const ENTRY_DURATION=5.6;
 const DOOR_OPEN_ANGLE=Math.PI*.495;
 const ZONE_TRAVEL_DURATION=1.55;
+const CURATOR_DIRECTION_DAMPING=3.2;
+const CURATOR_TURN_CONFIRM=coarsePointer?.28:.24;
+const CURATOR_TURN_INTERVAL=coarsePointer?.52:.46;
+const CURATOR_IDLE_RETURN_DELAY=.85;
 const PITCH_MIN=-.24,PITCH_MAX=.42;
 const MANUAL_MOVE_SPEED=4.4,CLICK_MOVE_MAX_SPEED=3.8,CLICK_STOP_RADIUS=.12,DRAG_THRESHOLD=coarsePointer?14:10;
 let zoneTravelStartAngle=0,zoneTravelAngleDelta=0,zoneTravelStartRadius=0,zoneTravelEndRadius=0,zoneTravelStartYaw=0,zoneTravelEndYaw=0,zoneTravelChild=0;
@@ -190,7 +194,7 @@ function buildPlant(x,z){
 }
 function buildCurator(){
   const loader=new THREE.TextureLoader(),textures={idle:loader.load('assets/curator-maru.png'),frontA:loader.load('assets/curator-walk-a.png'),frontB:loader.load('assets/curator-walk-b.png'),sideA:loader.load('assets/curator-side-a.png'),sideB:loader.load('assets/curator-side-b.png'),backA:loader.load('assets/curator-back-a.png'),backB:loader.load('assets/curator-back-b.png')};Object.values(textures).forEach(t=>t.colorSpace=THREE.SRGBColorSpace);
-  const g=new THREE.Sprite(new THREE.SpriteMaterial({map:textures.idle,color:0xd7c8b8,transparent:true,alphaTest:.04,depthWrite:false,toneMapped:true}));g.scale.set(1.28,1.92,1);g.position.set(1.35,.96,6.7);g.visible=false;g.renderOrder=4;g.userData={type:'curator',textures,currentTexture:textures.idle,facing:'front'};scene.add(g);scene.userData.curator=g;
+  const g=new THREE.Sprite(new THREE.SpriteMaterial({map:textures.idle,color:0xd7c8b8,transparent:true,alphaTest:.04,depthWrite:false,toneMapped:true}));g.scale.set(1.28,1.92,1);g.position.set(1.35,.96,6.7);g.visible=false;g.renderOrder=4;g.userData={type:'curator',textures,currentTexture:textures.idle,facing:'front',facingCandidate:'front',facingCandidateSince:0,lastFacingChange:0,sideSign:1,lastSideSignChange:0,smoothedMotion:new THREE.Vector3(0,0,-1)};scene.add(g);scene.userData.curator=g;
   const shadow=makeContactShadow(g.position.x,g.position.z,.86,.34,.24);shadow.visible=false;scene.userData.curatorShadow=shadow;curatorLastCameraPosition.copy(camera.position);
 }
 function buildWarmLights(){
@@ -221,7 +225,7 @@ function bind(){
   const finishDrag=e=>{if(dragging&&!dragMoved&&e?.type==='pointerup')handleWorldClick(e.clientX,e.clientY);dragging=false;dragMode=null;canvas.classList.remove('is-dragging','is-moving-drag')};
   canvas.addEventListener('pointerleave',finishDrag);canvas.addEventListener('pointercancel',finishDrag);canvas.addEventListener('lostpointercapture',finishDrag);canvas.addEventListener('pointerup',finishDrag);
   canvas.addEventListener('wheel',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;e.preventDefault();if(e.shiftKey){pitch=THREE.MathUtils.clamp(pitch-e.deltaY*.0007,PITCH_MIN,PITCH_MAX);camera.rotation.x=pitch;return}const distance=THREE.MathUtils.clamp(-e.deltaY*.01,-1.4,1.4);if(Math.abs(distance)>.03)queueDirectionalMove(distance)},{passive:false});
-  $('#enter').onclick=()=>{started=true;startAmbientMusic();primeGuideAudio();showEntryPortal();$('#intro').classList.add('closed');$('#hud').hidden=false;startEntrySequence()};
+  $('#enter').onclick=()=>{started=true;startAmbientMusic();primeGuideAudio();hideEntryPortal(true);$('#intro').classList.add('closed');$('#hud').hidden=false;startEntrySequence()};
   $('#home').onclick=()=>{hideEntryPortal(true);$('#intro').classList.remove('closed');$('#hud').hidden=true;$('#hud').classList.remove('cinematic');started=false;tourActive=false;entryActive=false;zoneTravelActive=false;hasDestination=false;if($('#guide-replay'))$('#guide-replay').hidden=true;resetEntrance();stopAmbientMusic();stopGuideVoice()};
   if($('#music-toggle'))$('#music-toggle').onclick=()=>musicOn?stopAmbientMusic():startAmbientMusic();
   if($('#guide-replay'))$('#guide-replay').onclick=replayCuratorGuide;
@@ -268,15 +272,28 @@ function updateCurator(dt,now){
   else curatorTarget.set(camera.position.x+forwardX*3,.96,camera.position.z+forwardZ*3);
   curatorTarget.x=THREE.MathUtils.clamp(curatorTarget.x,-13.15,13.15);curatorTarget.z=THREE.MathUtils.clamp(curatorTarget.z,-11.45,11.45);
   curatorPositionDelta.copy(curatorTarget).sub(curator.position);curatorPositionDelta.y=0;const forceForward=zoneTravelActive||(hasDestination&&destinationTurnsView);if(forceForward)curatorMotionVector.set(forwardX,0,forwardZ);else if(cameraMoving)curatorMotionVector.copy(curatorCameraDelta).normalize();else if(moveTarget.lengthSq()>.01)curatorMotionVector.copy(moveTarget).normalize();else if(curatorPositionDelta.lengthSq()>.0004)curatorMotionVector.copy(curatorPositionDelta).normalize();else curatorMotionVector.set(0,0,0);
-  const walking=movingWithCamera||curatorPositionDelta.lengthSq()>.0225,screenX=curatorMotionVector.x*rightX+curatorMotionVector.z*rightZ,depth=curatorMotionVector.x*forwardX+curatorMotionVector.z*forwardZ,facing=resolveCuratorFacing(walking,forceForward,screenX,depth),step=Math.floor(now*4.2)%2?'A':'B',tex=walking?curator.userData.textures[`${facing}${step}`]:curator.userData.textures.idle;
-  const zoneScaleX=anchoredToZone?1.05:1.28;curator.scale.set(facing==='side'&&screenX>0?-zoneScaleX:zoneScaleX,anchoredToZone?1.58:1.92,1);curator.userData.facing=facing;document.body.dataset.curatorFacing=facing;document.body.dataset.curatorMotion=walking?'walking':'idle';document.body.dataset.curatorZoneSide=anchoredToZone&&!movingWithCamera?'right':'follow';
+  const walking=movingWithCamera||curatorPositionDelta.lengthSq()>.0225,smoothedMotion=curator.userData.smoothedMotion;
+  if(curatorMotionVector.lengthSq()>.0001){const directionAlpha=1-Math.exp(-CURATOR_DIRECTION_DAMPING*dt);if(smoothedMotion.lengthSq()<.0001)smoothedMotion.copy(curatorMotionVector);else smoothedMotion.lerp(curatorMotionVector,directionAlpha);smoothedMotion.normalize()}
+  const screenX=smoothedMotion.x*rightX+smoothedMotion.z*rightZ,depth=smoothedMotion.x*forwardX+smoothedMotion.z*forwardZ,desiredFacing=resolveCuratorFacing(walking,forceForward,screenX,depth),turnState=settleCuratorFacing(curator,desiredFacing,screenX,now,walking),facing=turnState.facing,step=Math.floor(now*4.2)%2?'A':'B',tex=walking?curator.userData.textures[`${facing}${step}`]:facing==='front'?curator.userData.textures.idle:curator.userData.textures[`${facing}A`];
+  const zoneScaleX=anchoredToZone?1.05:1.28;curator.scale.set(facing==='side'&&turnState.sideSign>0?-zoneScaleX:zoneScaleX,anchoredToZone?1.58:1.92,1);document.body.dataset.curatorFacing=facing;document.body.dataset.curatorDesiredFacing=desiredFacing;document.body.dataset.curatorTurnState=curator.userData.facingCandidate===facing?'steady':'settling';document.body.dataset.curatorMotion=walking?'walking':'idle';document.body.dataset.curatorZoneSide=anchoredToZone&&!movingWithCamera?'right':'follow';
   const textureReady=!!(tex?.image&&(!('complete' in tex.image)||tex.image.complete));if(textureReady&&curator.userData.currentTexture!==tex){curator.material.map=tex;curator.material.needsUpdate=true;curator.userData.currentTexture=tex}curator.material.rotation=walking?Math.sin(now*8.4)*.014:Math.sin(now*1.4)*.006;
   const curatorBaseY=anchoredToZone?.79:.96;curatorTarget.y=walking?curatorBaseY+Math.abs(Math.sin(now*8.4))*.028:curatorBaseY+Math.sin(now*1.8)*.006;curatorPositionDelta.copy(curatorTarget).sub(curator.position);const remaining=curatorPositionDelta.length();document.body.dataset.curatorGap=remaining.toFixed(2);if(zoneTravelActive)curator.position.copy(curatorTarget);else if(remaining>.0005){const maxSpeed=movingWithCamera?5.1:3.15,alpha=1-Math.exp(-(movingWithCamera?7.5:5.2)*dt),travel=Math.min(remaining,remaining*alpha,maxSpeed*dt);curator.position.addScaledVector(curatorPositionDelta,travel/remaining)}curatorLastCameraPosition.copy(camera.position);if(shadow){shadow.position.x=curator.position.x;shadow.position.z=curator.position.z;shadow.material.opacity=walking?.19:.24}
 }
 
 function resolveCuratorFacing(walking,forceForward,screenX,depth){if(!walking)return'front';if(forceForward)return'back';if(Math.abs(screenX)>Math.abs(depth)*.82)return'side';return depth>.03?'back':'front'}
 
-function validateMovementIntegrity(){const checks=[resolveCuratorFacing(true,true,1,0)==='back',resolveCuratorFacing(true,false,0,1)==='back',resolveCuratorFacing(true,false,0,-1)==='front',resolveCuratorFacing(true,false,1,0)==='side',resolveCuratorFacing(true,false,-1,0)==='side',resolveCuratorFacing(false,false,1,1)==='front'];document.body.dataset.curatorMovementIntegrity=checks.every(Boolean)?'ok':'error';if(checks.some(check=>!check))throw new Error('Curator movement direction validation failed')}
+function curatorTurnStep(current,desired){if((current==='front'&&desired==='back')||(current==='back'&&desired==='front'))return'side';return desired}
+
+function settleCuratorFacing(curator,desiredFacing,screenX,now,walking){
+  const data=curator.userData,current=data.facing||'front';
+  if(data.facingCandidate!==desiredFacing){data.facingCandidate=desiredFacing;data.facingCandidateSince=now}
+  const confirmDelay=walking?CURATOR_TURN_CONFIRM:CURATOR_IDLE_RETURN_DELAY;
+  if(desiredFacing!==current&&now-data.facingCandidateSince>=confirmDelay&&now-data.lastFacingChange>=CURATOR_TURN_INTERVAL){data.facing=curatorTurnStep(current,desiredFacing);data.lastFacingChange=now}
+  if(data.facing==='side'&&Math.abs(screenX)>.28){const nextSign=screenX>0?1:-1;if(nextSign!==data.sideSign&&now-data.lastSideSignChange>=CURATOR_TURN_INTERVAL){data.sideSign=nextSign;data.lastSideSignChange=now}}
+  return{facing:data.facing||'front',sideSign:data.sideSign||1}
+}
+
+function validateMovementIntegrity(){const checks=[resolveCuratorFacing(true,true,1,0)==='back',resolveCuratorFacing(true,false,0,1)==='back',resolveCuratorFacing(true,false,0,-1)==='front',resolveCuratorFacing(true,false,1,0)==='side',resolveCuratorFacing(true,false,-1,0)==='side',resolveCuratorFacing(false,false,1,1)==='front',curatorTurnStep('front','back')==='side',curatorTurnStep('back','front')==='side',curatorTurnStep('side','front')==='front',curatorTurnStep('side','back')==='back',CURATOR_TURN_INTERVAL>=.3];document.body.dataset.curatorMovementIntegrity=checks.every(Boolean)?'ok':'error';document.body.dataset.curatorTurnInterval=CURATOR_TURN_INTERVAL.toFixed(2);if(checks.some(check=>!check))throw new Error('Curator movement direction validation failed')}
 
 function startAmbientMusic(){
   if(!audioContext){audioContext=new (window.AudioContext||window.webkitAudioContext)();audioMaster=audioContext.createGain();const filter=audioContext.createBiquadFilter();filter.type='lowpass';filter.frequency.value=1800;audioMaster.gain.value=.0001;audioMaster.connect(filter).connect(audioContext.destination)}
