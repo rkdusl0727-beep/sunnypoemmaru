@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=91">
+  <link rel="stylesheet" href="styles.css?v=92">
 </head>
 <body data-admin="true" class="admin-mode">
   <a class="skip" href="#settings-panel">3D 전시를 건너뛰고 설정 열기</a>
@@ -72,7 +72,7 @@
         <div class="cheer-heading"><div><small>작품에 전하는 한마디</small><h3 id="cheer-title">따뜻한 응원</h3></div><span id="cheer-count">응원 0개</span></div>
         <div id="cheer-list" class="cheer-list"></div>
         <button id="cheer-toggle" class="cheer-toggle" type="button" aria-expanded="false">응원 남기기</button>
-        <form id="cheer-form" class="cheer-form" hidden><label><span>보내는 분</span><input id="cheer-author" type="text" maxlength="12"></label><label><span>응원 한마디</span><textarea id="cheer-message" maxlength="100" rows="3"></textarea></label><div class="cheer-form-bottom"><small><span id="cheer-length">0</span>/100</small><button type="submit">응원 보내기</button></div><p id="cheer-status" role="status" aria-live="polite"></p></form>
+        <form id="cheer-form" class="cheer-form" hidden><label><span>보내는 분</span><input id="cheer-author" type="text" maxlength="12"></label><label><span>응원 한마디</span><textarea id="cheer-message" maxlength="100" rows="3"></textarea></label><fieldset class="cheer-color-picker"><legend>포스트잇 색상</legend><label style="--swatch:#fff1a8"><input type="radio" name="cheer-color" value="#fff1a8" checked><span>노랑</span></label></fieldset><div class="cheer-form-bottom"><small><span id="cheer-length">0</span>/100</small><button type="submit">응원 보내기</button></div><p id="cheer-status" role="status" aria-live="polite"></p></form>
       </section>
       <footer><button id="prev-poem" type="button"><img class="nav-arrow" src="assets/ui-arrow-left.png" alt="" aria-hidden="true">이전 작품</button><button id="next-poem" type="button">다음 작품<img class="nav-arrow" src="assets/ui-arrow-right.png" alt="" aria-hidden="true"></button></footer>
     </article>
@@ -110,6 +110,6 @@
     <div id="settings-list" class="settings-list"></div>
   </aside>
 
-  <script type="module" src="app.js?v=91"></script>
+  <script type="module" src="app.js?v=92"></script>
 </body>
 </html>
