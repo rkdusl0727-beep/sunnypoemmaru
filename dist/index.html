@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=88">
+  <link rel="stylesheet" href="styles.css?v=90">
 </head>
 <body data-admin="false">
   <a class="skip" href="#index-panel">3D 전시를 건너뛰고 작품 목록 보기</a>
@@ -62,6 +62,10 @@
       <button class="modal-close close-button" type="button" data-close aria-label="작품 닫기"><img src="assets/ui-close.png" alt="" aria-hidden="true"></button>
       <div class="poem-meta"><span id="poem-dot"></span><p>어린이 작가<br><strong id="poem-child"></strong></p><em id="poem-number"></em></div>
       <h2 id="poem-title" class="sr-only">작품 원본</h2>
+      <div class="poem-scan-stage">
+        <img id="poem-scan" class="poem-scan" alt="" hidden>
+        <div id="poem-scan-empty" class="poem-scan-empty"><strong>작품 원본 준비 중</strong><p>관리자가 스캔 이미지를 등록하면<br>아이의 작품 원본이 그대로 표시됩니다.</p></div>
+      </div>
       <section class="cheer-section" aria-labelledby="cheer-title">
         <div class="cheer-heading"><div><small>작품에 전하는 한마디</small><h3 id="cheer-title">따뜻한 응원</h3></div><span id="cheer-count">응원 0개</span></div>
         <div id="cheer-list" class="cheer-list"></div>
@@ -73,10 +77,6 @@
           <p id="cheer-status" role="status" aria-live="polite"></p>
         </form>
       </section>
-      <div class="poem-scan-stage">
-        <img id="poem-scan" class="poem-scan" alt="" hidden>
-        <div id="poem-scan-empty" class="poem-scan-empty"><strong>작품 원본 준비 중</strong><p>관리자가 스캔 이미지를 등록하면<br>아이의 작품 원본이 그대로 표시됩니다.</p></div>
-      </div>
       <footer><button id="prev-poem" type="button"><img class="nav-arrow" src="assets/ui-arrow-left.png" alt="" aria-hidden="true">이전 작품</button><button id="next-poem" type="button">다음 작품<img class="nav-arrow" src="assets/ui-arrow-right.png" alt="" aria-hidden="true"></button></footer>
     </article>
   </section>
@@ -89,6 +89,6 @@
 
   <audio id="curator-guide-audio" src="assets/curator-guide.mp3" preload="auto" playsinline hidden></audio>
 
-  <script type="module" src="app.js?v=88"></script>
+  <script type="module" src="app.js?v=90"></script>
 </body>
 </html>
