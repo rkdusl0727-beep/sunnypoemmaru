@@ -141,8 +141,8 @@ function buildZone(ci){
   const wood=new THREE.Mesh(new THREE.BoxGeometry(6.57,1.02,.32),new THREE.MeshStandardMaterial({color:0x9b6840,roughness:.85}));wood.position.y=.53;zone.add(wood);
   const navigationTarget=zoneLocalToWorld(layout,0,3.65);panel.userData={type:'navigation',target:navigationTarget};wood.userData={type:'navigation',target:navigationTarget};navigationMeshes.push(panel,wood);
   scene.userData.theme.panels.push(panel.material);scene.userData.theme.bases.push(wood.material);
-  const header=new THREE.Mesh(new THREE.PlaneGeometry(3.8,.95),new THREE.MeshBasicMaterial({map:makeTextTexture(c.name,'어린이 작가의 방',c.color,1024,256),transparent:true}));
-  header.position.set(0,4.35,.17);zone.add(header);
+  const header=new THREE.Mesh(new THREE.PlaneGeometry(4.35,.95),new THREE.MeshBasicMaterial({map:makeTextTexture(c.name,c.color,1024,256),transparent:true}));
+  header.position.set(0,4.13,.17);zone.add(header);
   const accent=new THREE.Mesh(new THREE.BoxGeometry(6.05,.06,.08),new THREE.MeshBasicMaterial({color:c.color}));accent.position.set(0,3.84,.18);zone.add(accent);
   const groups=[];c.poems.forEach((p,pi)=>{
     const key=`${ci}-${pi}`,preset=galleryConfig.frames[key]||'portrait',framedArt=new THREE.Group();framedArt.position.z=.22;
@@ -182,10 +182,9 @@ async function applyFramePreset(key,presetName,persist=true){
   const group=frameGroups.get(key);if(!group||!FRAME_PRESETS[presetName])return;galleryConfig.frames[key]=presetName;setFrameGeometry(group,presetName);layoutZoneFrames(group.userData.ci);const {ci,pi}=group.userData,art=group.userData.art,record=scanRecords.get(key);
   if(record){try{record.displayBlob=await createDisplayBlob(record.originalBlob,presetName);await putScanRecord(record);applyScanTexture(record)}catch(error){setScanStatus(error?.message||'액자용 이미지를 다시 만들지 못했어요.',true)}}else{art.material.map=makePoemPngTexture(ci,pi,presetName);art.material.needsUpdate=true}if(persist)saveGalleryConfig()
 }
-function makeTextTexture(title,sub,color,w,h){
+function makeTextTexture(title,color,w,h){
   const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');
-  x.textAlign='center';x.fillStyle=color;x.font='76px Jua, sans-serif';x.fillText(title,w/2,105);
-  x.fillStyle='#6a513d';x.font='28px Gowun Dodum, sans-serif';x.fillText(sub,w/2,164);
+  x.textAlign='center';x.textBaseline='middle';x.font='108px Jua, sans-serif';x.lineJoin='round';x.lineWidth=7;x.strokeStyle='#6a513da6';x.strokeText(title,w/2,h/2+4);x.fillStyle=color;x.fillText(title,w/2,h/2+4);
   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;
 }
 function makePoemPngTexture(ci,pi,presetName='portrait'){
