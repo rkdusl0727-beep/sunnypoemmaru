@@ -17,7 +17,7 @@ const adminMode=document.body.dataset.admin==='true';
 const ADMIN_CREDENTIAL_KEY='sunnyPoemAdminCredential',ADMIN_SESSION_KEY='sunnyPoemAdminSession';
 const CHEER_STORAGE_KEY='sunnyPoemCheers',CHEER_MAX_LENGTH=100;
 const CHEER_NOTE_COLORS=['#fff1a8','#ffd8d2','#d9f0d0','#d9e8ff','#eadcff'];
-const CHEER_BOARD_WIDTH=5.45,CHEER_BOARD_HEIGHT=1.08;
+const CHEER_BOARD_WIDTH=5.05,CHEER_BOARD_HEIGHT=1.08;
 const canvas=$('#gallery-canvas');
 let scene,camera,renderer,clock,raycaster,frameMeshes=[],navigationMeshes=[],yaw=0,pitch=0,started=false,modalOpen=false,overviewMode=false;
 let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,dragMode=null,dragStartX=0,dragStartY=0,lastX=0,lastY=0,keys={};
@@ -152,9 +152,9 @@ function buildZone(ci){
     const messageCard=new THREE.Mesh(new THREE.PlaneGeometry(1,.36),new THREE.MeshBasicMaterial({transparent:true,depthWrite:false,toneMapped:false,side:THREE.DoubleSide}));messageCard.position.z=.11;messageCard.renderOrder=3;messageCard.visible=false;messageCard.userData={type:'poem',child:ci,poem:pi,cheerCard:true};framedArt.add(messageCard);frameMeshes.push(messageCard);messageCardMeshes.set(key,messageCard);
     framedArt.userData={key,ci,pi,preset,frameBody,art,frame,messageCard};frameGroups.set(key,framedArt);groups.push(framedArt);zone.add(framedArt);setFrameGeometry(framedArt,preset);
   });zoneFrameGroups.set(ci,groups);layoutZoneFrames(ci);
-  const cheerBoardTexture=makeChildCheerBoardTexture(ci,[]);cheerBoardTexture.userData.cheerBoard=true;const cheerBoardHeight=cheerBoardTexture.userData.boardHeight;const cheerBoard=new THREE.Mesh(new THREE.PlaneGeometry(CHEER_BOARD_WIDTH,cheerBoardHeight),new THREE.MeshBasicMaterial({map:cheerBoardTexture,transparent:true,depthWrite:false,toneMapped:false,side:THREE.DoubleSide}));cheerBoard.position.set(-.12,cheerBoardHeight/2+.04,.19);cheerBoard.renderOrder=3;cheerBoard.userData={type:'cheer-board',child:ci};zone.add(cheerBoard);zoneCheerBoardMeshes.set(ci,cheerBoard);
+  const cheerBoardTexture=makeChildCheerBoardTexture(ci,[]);cheerBoardTexture.userData.cheerBoard=true;const cheerBoardHeight=cheerBoardTexture.userData.boardHeight;const cheerBoard=new THREE.Mesh(new THREE.PlaneGeometry(CHEER_BOARD_WIDTH,cheerBoardHeight),new THREE.MeshBasicMaterial({map:cheerBoardTexture,transparent:true,depthWrite:false,toneMapped:false,side:THREE.DoubleSide}));cheerBoard.position.set(0,cheerBoardHeight/2+.04,.19);cheerBoard.renderOrder=3;cheerBoard.userData={type:'cheer-board',child:ci};zone.add(cheerBoard);zoneCheerBoardMeshes.set(ci,cheerBoard);
   const glowPos=zoneLocalToWorld(layout,0,2.2);const zoneGlow=new THREE.PointLight(c.color,.38,6,2);zoneGlow.position.set(glowPos.x,3.6,glowPos.z);scene.add(zoneGlow);
-  const plantPos=zoneLocalToWorld(layout,3.42,1.05);buildPlant(plantPos.x,plantPos.z);
+  const plantPos=zoneLocalToWorld(layout,3.35,.34);buildPlant(plantPos.x,plantPos.z);
 }
 
 function zoneLocalToWorld(layout,x,z){return new THREE.Vector3(layout.x+Math.cos(layout.ry)*x+Math.sin(layout.ry)*z,0,layout.z-Math.sin(layout.ry)*x+Math.cos(layout.ry)*z)}
@@ -409,7 +409,7 @@ function fitCheerMessage(context,text,maxWidth,maxHeight){
   context.font='700 8px Gowun Dodum, sans-serif';const lines=wrapCheerText(context,text,maxWidth);return{fontSize:8,lineHeight:Math.max(6,maxHeight/Math.max(1,lines.length)),lines}
 }
 function makeChildCheerBoardTexture(ci,items){
-  const columns=Math.min(4,Math.max(1,items.length)),rows=Math.max(1,Math.ceil(items.length/columns)),canvas=document.createElement('canvas');canvas.width=1536;canvas.height=300+Math.max(0,rows-2)*104;
+  const columns=Math.min(3,Math.max(1,items.length)),rows=Math.max(1,Math.ceil(items.length/columns)),canvas=document.createElement('canvas');canvas.width=1536;canvas.height=300+Math.max(0,rows-2)*104;
   const context=canvas.getContext('2d'),accent=children[ci]?.color||'#e5b566',boardX=12,boardY=10,boardWidth=1512,boardHeight=canvas.height-20,gridX=218,gridY=18,gridWidth=canvas.width-gridX-18,gridHeight=canvas.height-36,cellWidth=gridWidth/columns,cellHeight=gridHeight/rows;
   context.clearRect(0,0,canvas.width,canvas.height);context.shadowColor='#5a3b2228';context.shadowBlur=16;context.shadowOffsetY=7;roundedRect(context,boardX,boardY,boardWidth,boardHeight,24);context.fillStyle='#f3e1c3';context.fill();context.shadowColor='transparent';context.lineWidth=4;context.strokeStyle=accent;context.stroke();
   context.fillStyle='#6e4c36';context.font='700 25px Gowun Dodum, sans-serif';context.fillText('따뜻한 응원',42,58);context.fillStyle='#9a7658';context.font='21px Gowun Dodum, sans-serif';context.fillText(children[ci]?.name||defaultChildName(ci),42,94);context.fillStyle='#fff7e8';roundedRect(context,42,116,142,42,21);context.fill();context.fillStyle='#765338';context.font='700 19px Gowun Dodum, sans-serif';context.textAlign='center';context.fillText(`응원 ${items.length}개`,113,144);context.textAlign='left';
