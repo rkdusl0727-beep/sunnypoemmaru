@@ -18,12 +18,14 @@ const ADMIN_CREDENTIAL_KEY='sunnyPoemAdminCredential',ADMIN_SESSION_KEY='sunnyPo
 const CHEER_STORAGE_KEY='sunnyPoemCheers',CHEER_MAX_LENGTH=100;
 const CHEER_NOTE_COLORS=['#fff1a8','#ffd8d2','#d9f0d0','#d9e8ff','#eadcff'];
 const CHEER_BOARD_WIDTH=5.05,CHEER_BOARD_HEIGHT=1.08;
+const ARTWORK_INTERACTION_DISTANCE=10,ARTWORK_FRONT_DISTANCE=3.55,ARTWORK_FRONT_FOV=58;
 const canvas=$('#gallery-canvas');
 let scene,camera,renderer,clock,raycaster,frameMeshes=[],navigationMeshes=[],yaw=0,pitch=0,started=false,modalOpen=false,overviewMode=false;
 let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,dragMode=null,dragStartX=0,dragStartY=0,lastX=0,lastY=0,keys={};
 let tourActive=false,tourElapsed=0,tourStartedAt=0,entryActive=false,entryElapsed=0,entryStartedAt=0,hasDestination=false,zoneTravelActive=false,zoneTravelElapsed=0;
 let activeChildZone=-1,lastFocusedArtwork=null;
 let destinationTurnsView=true;
+let artworkViewRestore=null;
 let audioContext,audioMaster,musicTimer,musicStep=0,musicOn=true;
 let guideAudioPending=false,guidePlayed=false,guideAudioPrimed=false,guideRetryBound=false,guideAudioReadyPromise=null,guideAudioDecodePromise=null,guideAudioBuffer=null,guideAudioSource=null,contactShadowTexture=null;
 const guideAudioElement=$('#curator-guide-audio');
@@ -316,7 +318,7 @@ function updateZone(){
 }
 function updateFocus(){
   raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
-  const hits=raycaster.intersectObjects(frameMeshes,false),hit=hits[0]&&hits[0].distance<7?hits[0]:null;
+  const hits=raycaster.intersectObjects(frameMeshes,false),hit=hits[0]&&hits[0].distance<ARTWORK_INTERACTION_DISTANCE?hits[0]:null;
   $('#crosshair').classList.toggle('active',!!hit);camera.userData.focus=hit?.object||null;if(hit)lastFocusedArtwork=hit.object;
 }
 function activateCenter(){if(camera.userData.focus){const d=camera.userData.focus.userData;openPoem(d.child,d.poem)}}
@@ -330,7 +332,7 @@ function handleWorldClick(x,y){
   const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height||x<rect.left||x>rect.right||y<rect.top||y>rect.bottom)return;
   clickPoint.set((x-rect.left)/rect.width*2-1,-((y-rect.top)/rect.height*2-1));raycaster.setFromCamera(clickPoint,camera);
   const subject=raycaster.intersectObjects(frameMeshes,false)[0],navigationHit=raycaster.intersectObjects(navigationMeshes,false)[0],floorHit=raycaster.intersectObject(scene.userData.floor,false)[0];
-  if(subject&&subject.distance<7){const d=subject.object.userData;openPoem(d.child,d.poem);return}
+  if(subject&&subject.distance<ARTWORK_INTERACTION_DISTANCE){const d=subject.object.userData;openPoem(d.child,d.poem);return}
   const nearestDistance=Math.min(navigationHit?.distance??Infinity,floorHit?.distance??Infinity);
   if(navigationHit&&navigationHit.distance===nearestDistance){setMoveDestination(navigationHit.object.userData.target,true,true);return}
   if(floorHit){setMoveDestination(floorHit.point,true,true);return}
@@ -376,15 +378,29 @@ function updateZoneTravel(dt){
 function updateMap(){const x=camera.position.x/15*40,z=camera.position.z/13.2*40;$('#map-dot').style.transform=`translate(${x}px,${z}px)`;$('#map-view').style.transform=`rotate(${-yaw}rad)`}
 function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,coarsePointer?1:1.25))}
 
+function getArtworkFrontView(ci,pi){
+  const group=frameGroups.get(`${ci}-${pi}`),layout=ZONE_LAYOUT[ci];if(!group||!layout)return null;
+  const target=zoneLocalToWorld(layout,group.position.x,.22),position=zoneLocalToWorld(layout,group.position.x,ARTWORK_FRONT_DISTANCE);target.y=group.position.y;position.y=target.y;
+  const dx=target.x-position.x,dz=target.z-position.z;return{position,target,yaw:Math.atan2(-dx,-dz),pitch:0}
+}
+function focusArtworkFront(ci,pi){
+  const view=getArtworkFrontView(ci,pi);if(!view)return false;
+  if(!artworkViewRestore)artworkViewRestore={position:camera.position.clone(),yaw,pitch,fov:camera.fov,activeChildZone};
+  moveVelocity.set(0,0,0);moveTarget.set(0,0,0);hasDestination=false;zoneTravelActive=false;scene.userData.clickMarker.visible=false;camera.position.copy(view.position);yaw=view.yaw;pitch=view.pitch;camera.fov=ARTWORK_FRONT_FOV;camera.updateProjectionMatrix();camera.rotation.set(pitch,yaw,0);activeChildZone=ci;$('#zone-name').textContent=`${children[ci].name} · 작품 ${pi+1} 정면 보기`;document.body.dataset.artworkFrontView=`${ci}-${pi}`;document.body.dataset.artworkFrontAligned='true';return true
+}
+function restoreArtworkView(){
+  if(!artworkViewRestore)return;camera.position.copy(artworkViewRestore.position);yaw=artworkViewRestore.yaw;pitch=artworkViewRestore.pitch;camera.fov=artworkViewRestore.fov;activeChildZone=artworkViewRestore.activeChildZone;camera.updateProjectionMatrix();camera.rotation.set(pitch,yaw,0);artworkViewRestore=null;delete document.body.dataset.artworkFrontView;delete document.body.dataset.artworkFrontAligned;updateZone();updateMap()
+}
 function openPoem(ci,pi){
   moveVelocity.set(0,0,0);hasDestination=false;scene.userData.clickMarker.visible=false;
+  focusArtworkFront(ci,pi);
   selectedChild=ci;selectedPoem=pi;modalOpen=true;const c=children[ci];
   visited.add(`${ci}-${pi}`);localStorage.setItem('galleryVisited',JSON.stringify([...visited]));
   $('.poem-card').style.setProperty('--accent',c.color);$('#poem-child').textContent=c.name;$('#poem-number').textContent=`작품 ${pi+1} / ${c.poems.length}`;
   $('#poem-title').textContent=`${c.name} 작품 ${pi+1} 원본`;showPoemScan(ci,pi);renderCheerSection(ci,pi);collapseCheerForm();$('#poem-modal').classList.add('open');$('#poem-modal').setAttribute('aria-hidden','false');
   setTimeout(()=>$('.modal-close').focus(),250);
 }
-function closePoem(){modalOpen=false;$('#poem-modal').classList.remove('open');$('#poem-modal').setAttribute('aria-hidden','true');if(activeScanUrl){URL.revokeObjectURL(activeScanUrl);activeScanUrl=null}}
+function closePoem(){modalOpen=false;$('#poem-modal').classList.remove('open');$('#poem-modal').setAttribute('aria-hidden','true');if(activeScanUrl){URL.revokeObjectURL(activeScanUrl);activeScanUrl=null}restoreArtworkView()}
 function movePoem(step){const count=children[selectedChild]?.poems.length||POEMS_PER_CHILD;selectedPoem=(selectedPoem+step+count)%count;openPoem(selectedChild,selectedPoem)}
 function openIndex(){modalOpen=true;$('#index-panel').classList.add('open');$('#index-panel').setAttribute('aria-hidden','false')}
 function closeIndex(){modalOpen=false;$('#index-panel').classList.remove('open');$('#index-panel').setAttribute('aria-hidden','true')}
@@ -501,7 +517,8 @@ function buildIndex(){
   $$('[data-ci]').forEach(b=>b.onclick=()=>{closeIndex();openPoem(+b.dataset.ci,+b.dataset.pi)});
 }
 function validateGalleryIntegrity(){
-  const expectedWorks=children.length*POEMS_PER_CHILD,checks={children:children.length,zones:zoneFrameGroups.size,cheerBoards:zoneCheerBoardMeshes.size,frames:frameGroups.size,artworks:poemArtMeshes.size,indexChildren:$('#index-list').querySelectorAll('.index-child').length,indexWorks:$('#index-list').querySelectorAll('[data-ci]').length,settingsWorks:adminMode?$('#settings-list').querySelectorAll('[data-scan-slot]').length:expectedWorks};
-  const failures=[];if(ZONE_LAYOUT.length<children.length)failures.push('zone-layout');if(checks.children!==galleryConfig.childCount)failures.push('child-config');if(checks.zones!==children.length)failures.push('zone-count');if(checks.cheerBoards!==children.length)failures.push('cheer-board-count');if(checks.frames!==expectedWorks)failures.push('frame-count');if(checks.artworks!==expectedWorks)failures.push('artwork-count');if(checks.indexChildren!==children.length)failures.push('index-child-count');if(checks.indexWorks!==expectedWorks)failures.push('index-work-count');if(checks.settingsWorks!==expectedWorks)failures.push('settings-work-count');document.body.dataset.galleryChildren=String(children.length);document.body.dataset.galleryWorks=String(expectedWorks);document.body.dataset.galleryCheerBoards=String(checks.cheerBoards);document.body.dataset.galleryIntegrity=failures.length?'error':'ok';if(failures.length)throw new Error(`Gallery integrity check failed: ${failures.join(', ')}`)
+  const expectedWorks=children.length*POEMS_PER_CHILD,frontViews=Array.from({length:children.length},(_,ci)=>Array.from({length:POEMS_PER_CHILD},(_,pi)=>getArtworkFrontView(ci,pi))).flat(),frontViewAligned=frontViews.every(view=>{if(!view||![view.position.x,view.position.y,view.position.z,view.yaw].every(Number.isFinite))return false;const forward=new THREE.Vector3(-Math.sin(view.yaw),0,-Math.cos(view.yaw)),direction=view.target.clone().sub(view.position);direction.y=0;return direction.lengthSq()>.01&&forward.dot(direction.normalize())>.999});
+  const checks={children:children.length,zones:zoneFrameGroups.size,cheerBoards:zoneCheerBoardMeshes.size,frames:frameGroups.size,artworks:poemArtMeshes.size,frontViews:frontViews.filter(Boolean).length,indexChildren:$('#index-list').querySelectorAll('.index-child').length,indexWorks:$('#index-list').querySelectorAll('[data-ci]').length,settingsWorks:adminMode?$('#settings-list').querySelectorAll('[data-scan-slot]').length:expectedWorks};
+  const failures=[];if(ZONE_LAYOUT.length<children.length)failures.push('zone-layout');if(checks.children!==galleryConfig.childCount)failures.push('child-config');if(checks.zones!==children.length)failures.push('zone-count');if(checks.cheerBoards!==children.length)failures.push('cheer-board-count');if(checks.frames!==expectedWorks)failures.push('frame-count');if(checks.artworks!==expectedWorks)failures.push('artwork-count');if(checks.frontViews!==expectedWorks||!frontViewAligned)failures.push('front-view-count');if(checks.indexChildren!==children.length)failures.push('index-child-count');if(checks.indexWorks!==expectedWorks)failures.push('index-work-count');if(checks.settingsWorks!==expectedWorks)failures.push('settings-work-count');document.body.dataset.galleryChildren=String(children.length);document.body.dataset.galleryWorks=String(expectedWorks);document.body.dataset.galleryCheerBoards=String(checks.cheerBoards);document.body.dataset.artworkFrontViews=String(checks.frontViews);document.body.dataset.artworkFrontIntegrity=frontViewAligned&&checks.frontViews===expectedWorks?'ok':'error';document.body.dataset.galleryIntegrity=failures.length?'error':'ok';if(failures.length)throw new Error(`Gallery integrity check failed: ${failures.join(', ')}`)
 }
 init();
