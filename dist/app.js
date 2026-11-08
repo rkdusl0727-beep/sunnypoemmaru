@@ -30,10 +30,14 @@ let audioContext,audioMaster,musicTimer,musicStep=0,musicOn=true;
 let guideAudioPending=false,guidePlayed=false,guideAudioPrimed=false,guideRetryBound=false,guideAudioReadyPromise=null,guideAudioDecodePromise=null,guideAudioBuffer=null,guideAudioSource=null,contactShadowTexture=null;
 const guideAudioElement=$('#curator-guide-audio');
 let entryPortalOpenTimer=null,entryPortalHideTimer=null;
+let tourUiUpdatedAt=0,tourFrameCount=0,tourFrameStartedAt=0;
 const coarsePointer=matchMedia('(pointer:coarse)').matches||innerWidth<800,reduceMotion=matchMedia('(prefers-reduced-motion:reduce)').matches,moveVelocity=new THREE.Vector3(),moveTarget=new THREE.Vector3(),moveDestination=new THREE.Vector3(),curatorTarget=new THREE.Vector3(),curatorLastCameraPosition=new THREE.Vector3(),curatorCameraDelta=new THREE.Vector3(),curatorMotionVector=new THREE.Vector3(),curatorPositionDelta=new THREE.Vector3(),clickPoint=new THREE.Vector2();
 const cameraPos=new THREE.Vector3(0,1.65,11.2);
 const zoneTravelStart=new THREE.Vector3(),zoneTravelEnd=new THREE.Vector3();
 const TOUR_DURATION=10;
+const BASE_PIXEL_RATIO=Math.min(devicePixelRatio,coarsePointer?1:1.25);
+const TOUR_PIXEL_RATIO=Math.min(devicePixelRatio,coarsePointer?.58:.68);
+const TOUR_UI_INTERVAL=120;
 const ENTRY_DURATION=5.6;
 const DOOR_OPEN_ANGLE=Math.PI*.495;
 const ZONE_TRAVEL_DURATION=1.55;
@@ -75,9 +79,9 @@ async function init(){
   camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,.08,100);
   camera.position.copy(cameraPos);camera.rotation.order='YXZ';
   renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
-  renderer.setPixelRatio(Math.min(devicePixelRatio,coarsePointer?1:1.25));renderer.setSize(innerWidth,innerHeight);
+  renderer.setPixelRatio(BASE_PIXEL_RATIO);renderer.setSize(innerWidth,innerHeight);
   renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.18;
-  renderer.shadowMap.enabled=!coarsePointer;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.shadowMap.enabled=false;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   clock=new THREE.Clock();raycaster=new THREE.Raycaster();
   buildGallery();bind();buildIndex();if(adminMode)buildSettings();refreshCheerCards();validateGalleryIntegrity();validateMovementIntegrity();bindGuideAudioEvents();preloadGuideAudio().catch(()=>{});applyGalleryName(galleryConfig.name,false);applyGalleryTheme(galleryConfig.theme,false);loadStoredScans();if(renderer.shadowMap.enabled){renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true}animate();
   setTimeout(()=>$('#loading').classList.add('done'),450);
@@ -155,7 +159,6 @@ function buildZone(ci){
     framedArt.userData={key,ci,pi,preset,frameBody,art,frame,messageCard};frameGroups.set(key,framedArt);groups.push(framedArt);zone.add(framedArt);setFrameGeometry(framedArt,preset);
   });zoneFrameGroups.set(ci,groups);layoutZoneFrames(ci);
   const cheerBoardTexture=makeChildCheerBoardTexture(ci,[]);cheerBoardTexture.userData.cheerBoard=true;const cheerBoardHeight=cheerBoardTexture.userData.boardHeight;const cheerBoard=new THREE.Mesh(new THREE.PlaneGeometry(CHEER_BOARD_WIDTH,cheerBoardHeight),new THREE.MeshBasicMaterial({map:cheerBoardTexture,transparent:true,depthWrite:false,toneMapped:false,side:THREE.DoubleSide}));cheerBoard.position.set(0,cheerBoardHeight/2+.04,.19);cheerBoard.renderOrder=3;cheerBoard.userData={type:'cheer-board',child:ci};zone.add(cheerBoard);zoneCheerBoardMeshes.set(ci,cheerBoard);
-  const glowPos=zoneLocalToWorld(layout,0,2.2);const zoneGlow=new THREE.PointLight(c.color,.38,6,2);zoneGlow.position.set(glowPos.x,3.6,glowPos.z);scene.add(zoneGlow);
   const plantPos=zoneLocalToWorld(layout,3.35,.34);buildPlant(plantPos.x,plantPos.z);
 }
 
@@ -190,8 +193,8 @@ function makeTextTexture(title,color,w,h){
   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;
 }
 function makePoemPngTexture(ci,pi,presetName='portrait'){
-  const preset=FRAME_PRESETS[presetName]||FRAME_PRESETS.portrait,key=`${ci}-${pi}-${presetName}`;if(poemPngTextures.has(key))return poemPngTextures.get(key);const aspect=(preset.w-.18)/(preset.h-.24),c=document.createElement('canvas');c.width=640;c.height=Math.round(640/aspect);const x=c.getContext('2d'),d=children[ci],h=c.height,pad=Math.round(Math.min(c.width,h)*.085),landscape=aspect>1;
-  x.fillStyle='#fffaf0';x.fillRect(0,0,c.width,h);x.fillStyle=d.color;x.fillRect(0,0,c.width,Math.max(18,h*.035));x.fillStyle='#777f91';x.font=`${Math.max(18,h*.032)}px Gowun Dodum, sans-serif`;x.fillText(d.name,pad,h*.12);x.fillStyle='#463426';x.font=`${Math.max(34,h*(landscape?.082:.058))}px Jua, sans-serif`;x.fillText(`작품 ${pi+1}`,pad,h*.24);x.strokeStyle='#e5dfd2';x.beginPath();x.moveTo(pad,h*.29);x.lineTo(c.width-pad,h*.29);x.stroke();x.font=`${Math.max(20,h*(landscape?.05:.036))}px Gowun Dodum, sans-serif`;x.fillStyle='#766b60';['작품 원본','준비 중'].forEach((line,i)=>x.fillText(line,pad,h*(.48+i*(landscape?.12:.085))));x.fillStyle='#a9a190';x.font=`${Math.max(16,h*.026)}px Gowun Dodum, sans-serif`;x.fillText(`${pi+1} / ${POEMS_PER_CHILD}`,pad,h*.94);const png=c.toDataURL('image/png'),t=new THREE.TextureLoader().load(png);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=Math.min(renderer.capabilities.getMaxAnisotropy(),coarsePointer?2:4);t.userData={format:'image/png',source:'framed-artwork-png'};poemPngTextures.set(key,t);return t;
+  const preset=FRAME_PRESETS[presetName]||FRAME_PRESETS.portrait,key=`${ci}-${pi}-${presetName}`;if(poemPngTextures.has(key))return poemPngTextures.get(key);const aspect=(preset.w-.18)/(preset.h-.24),c=document.createElement('canvas'),textureWidth=coarsePointer?320:448;c.width=textureWidth;c.height=Math.round(textureWidth/aspect);const x=c.getContext('2d'),d=children[ci],h=c.height,pad=Math.round(Math.min(c.width,h)*.085),landscape=aspect>1;
+  x.fillStyle='#fffaf0';x.fillRect(0,0,c.width,h);x.fillStyle=d.color;x.fillRect(0,0,c.width,Math.max(18,h*.035));x.fillStyle='#777f91';x.font=`${Math.max(18,h*.032)}px Gowun Dodum, sans-serif`;x.fillText(d.name,pad,h*.12);x.fillStyle='#463426';x.font=`${Math.max(34,h*(landscape?.082:.058))}px Jua, sans-serif`;x.fillText(`작품 ${pi+1}`,pad,h*.24);x.strokeStyle='#e5dfd2';x.beginPath();x.moveTo(pad,h*.29);x.lineTo(c.width-pad,h*.29);x.stroke();x.font=`${Math.max(20,h*(landscape?.05:.036))}px Gowun Dodum, sans-serif`;x.fillStyle='#766b60';['작품 원본','준비 중'].forEach((line,i)=>x.fillText(line,pad,h*(.48+i*(landscape?.12:.085))));x.fillStyle='#a9a190';x.font=`${Math.max(16,h*.026)}px Gowun Dodum, sans-serif`;x.fillText(`${pi+1} / ${POEMS_PER_CHILD}`,pad,h*.94);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.generateMipmaps=false;t.minFilter=THREE.LinearFilter;t.magFilter=THREE.LinearFilter;t.anisotropy=1;t.userData={format:'image/png',source:'framed-artwork-png'};renderer.initTexture(t);poemPngTextures.set(key,t);return t;
 }
 function buildPlant(x,z){
   makePngSprite('assets/planter-png.png',1.12,1.42,[x,.69,z]);makeContactShadow(x,z,.8,.34,.19);
@@ -230,7 +233,7 @@ function bind(){
   canvas.addEventListener('pointerleave',finishDrag);canvas.addEventListener('pointercancel',finishDrag);canvas.addEventListener('lostpointercapture',finishDrag);canvas.addEventListener('pointerup',finishDrag);
   canvas.addEventListener('wheel',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;e.preventDefault();if(e.shiftKey){pitch=THREE.MathUtils.clamp(pitch-e.deltaY*.0007,PITCH_MIN,PITCH_MAX);camera.rotation.x=pitch;return}const distance=THREE.MathUtils.clamp(-e.deltaY*.01,-1.4,1.4);if(Math.abs(distance)>.03)queueDirectionalMove(distance)},{passive:false});
   $('#enter').onclick=()=>{started=true;startAmbientMusic();primeGuideAudio();hideEntryPortal(true);$('#intro').classList.add('closed');$('#hud').hidden=false;startEntrySequence()};
-  $('#home').onclick=()=>{hideEntryPortal(true);$('#intro').classList.remove('closed');$('#hud').hidden=true;$('#hud').classList.remove('cinematic');started=false;tourActive=false;entryActive=false;zoneTravelActive=false;hasDestination=false;if($('#guide-replay'))$('#guide-replay').hidden=true;resetEntrance();stopAmbientMusic();stopGuideVoice()};
+  $('#home').onclick=()=>{hideEntryPortal(true);$('#intro').classList.remove('closed');$('#hud').hidden=true;$('#hud').classList.remove('cinematic');started=false;tourActive=false;setPanoramaPerformanceMode(false);entryActive=false;zoneTravelActive=false;hasDestination=false;if($('#guide-replay'))$('#guide-replay').hidden=true;resetEntrance();stopAmbientMusic();stopGuideVoice()};
   if($('#music-toggle'))$('#music-toggle').onclick=()=>musicOn?stopAmbientMusic():startAmbientMusic();
   if($('#guide-replay'))$('#guide-replay').onclick=replayCuratorGuide;
   if($('#cheer-toggle'))$('#cheer-toggle').onclick=toggleCheerForm;
@@ -245,7 +248,7 @@ function bind(){
 function animate(){
   requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);
   if(started&&!modalOpen){
-    if(entryActive){updateEntrySequence(dt);updateMap()}else if(tourActive){updatePanoramaTour(dt);updateZone();updateMap()}else if(zoneTravelActive){updateZoneTravel(dt);updateMap()}else{
+    if(entryActive){updateEntrySequence(dt);updateMap()}else if(tourActive){updatePanoramaTour(dt);const nowMs=performance.now();if(nowMs-tourUiUpdatedAt>=TOUR_UI_INTERVAL){tourUiUpdatedAt=nowMs;updateZone();updateMap()}}else if(zoneTravelActive){updateZoneTravel(dt);updateMap()}else{
       const forward=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0);
       const side=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0);
       if(forward||side){hasDestination=false;scene.userData.clickMarker.visible=false;moveTarget.set(-Math.sin(yaw)*forward+Math.cos(yaw)*side,0,-Math.cos(yaw)*forward-Math.sin(yaw)*side);if(moveTarget.lengthSq()>1)moveTarget.normalize();moveTarget.multiplyScalar(MANUAL_MOVE_SPEED)}
@@ -359,24 +362,25 @@ function updateEntrySequence(dt){
   entryElapsed=Math.min(ENTRY_DURATION,(performance.now()-entryStartedAt)/1000);const t=entryElapsed/ENTRY_DURATION,doorT=THREE.MathUtils.smoothstep(THREE.MathUtils.clamp((t-.08)/.34,0,1),0,1),walkT=THREE.MathUtils.smoothstep(THREE.MathUtils.clamp((t-.42)/.58,0,1),0,1);setEntranceDoors(true,doorT);camera.position.z=THREE.MathUtils.lerp(16.5,11.2,walkT);camera.position.y=1.68+Math.sin(walkT*Math.PI)*.025;camera.fov=THREE.MathUtils.lerp(68,72,walkT);camera.updateProjectionMatrix();camera.rotation.set(0,0,0);if(t>=1){entryActive=false;setEntranceDoors(true);$('#hud').classList.remove('cinematic');camera.position.set(0,1.68,11.2);camera.fov=72;camera.updateProjectionMatrix();startPanoramaTour()}
 }
 function startPanoramaTour(){
-  setEntranceDoors(true);hasDestination=false;moveVelocity.set(0,0,0);tourElapsed=0;tourStartedAt=performance.now();tourActive=!reduceMotion;camera.fov=74;camera.updateProjectionMatrix();camera.position.set(0,2.08,8.2);yaw=0;pitch=-.03;camera.rotation.set(pitch,yaw,0);document.body.dataset.panoramaMotion=reduceMotion?'skipped':'continuous';if(reduceMotion)finishPanoramaTour()
+  setEntranceDoors(true);hasDestination=false;moveVelocity.set(0,0,0);tourElapsed=0;tourStartedAt=performance.now();tourUiUpdatedAt=0;tourFrameCount=0;tourFrameStartedAt=tourStartedAt;tourActive=!reduceMotion;setPanoramaPerformanceMode(tourActive);camera.fov=74;camera.updateProjectionMatrix();camera.position.set(0,2.08,8.2);yaw=0;pitch=-.03;camera.rotation.set(pitch,yaw,0);document.body.dataset.panoramaMotion=reduceMotion?'skipped':'continuous';if(reduceMotion)finishPanoramaTour()
 }
 function updatePanoramaTour(dt){
-  setEntranceDoors(true);tourElapsed=Math.min(TOUR_DURATION,(performance.now()-tourStartedAt)/1000);const t=tourElapsed/TOUR_DURATION,angle=t*Math.PI*2;document.body.dataset.panoramaAngle=angle.toFixed(4);camera.position.set(Math.sin(angle)*9.1,2.08,Math.cos(angle)*8.2);const dx=-camera.position.x,dz=-camera.position.z;yaw=Math.atan2(-dx,-dz);pitch=-.03;camera.rotation.set(pitch,yaw,0);if(t>=1)finishPanoramaTour()
+  tourFrameCount++;tourElapsed=Math.min(TOUR_DURATION,tourElapsed+Math.min(dt,1/30));const t=tourElapsed/TOUR_DURATION,angle=t*Math.PI*2;document.body.dataset.panoramaAngle=angle.toFixed(4);document.body.dataset.panoramaFrameMode='delta-smoothed';camera.position.set(Math.sin(angle)*9.1,2.08,Math.cos(angle)*8.2);const dx=-camera.position.x,dz=-camera.position.z;yaw=Math.atan2(-dx,-dz);pitch=-.03;camera.rotation.set(pitch,yaw,0);if(t>=1)finishPanoramaTour()
 }
-function finishPanoramaTour(){setEntranceDoors(true);activeChildZone=-1;tourActive=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,9.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구';const curator=scene.userData.curator,shadow=scene.userData.curatorShadow;if(curator){curator.position.set(1.35,.96,6.7);curator.visible=true}if(shadow){shadow.position.set(1.35,.012,6.7);shadow.visible=true}document.body.dataset.curatorState='visible';if(!adminMode){if($('#guide-replay'))$('#guide-replay').hidden=false;setTimeout(()=>{if(started&&!entryActive&&!tourActive)speakCurator()},450)}}
+function setPanoramaPerformanceMode(active){renderer.setPixelRatio(active?TOUR_PIXEL_RATIO:BASE_PIXEL_RATIO);(scene.userData.zoneGlows||[]).forEach(light=>light.visible=!active);document.body.dataset.panoramaQuality=active?'optimized':'full'}
+function finishPanoramaTour(){setEntranceDoors(true);activeChildZone=-1;tourActive=false;setPanoramaPerformanceMode(false);const elapsed=Math.max(.001,(performance.now()-tourFrameStartedAt)/1000);document.body.dataset.panoramaFps=String(Math.round(tourFrameCount/elapsed));moveVelocity.set(0,0,0);camera.position.set(0,1.65,9.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구';updateMap();const curator=scene.userData.curator,shadow=scene.userData.curatorShadow;if(curator){curator.position.set(1.35,.96,6.7);curator.visible=true}if(shadow){shadow.position.set(1.35,.012,6.7);shadow.visible=true}document.body.dataset.curatorState='visible';if(!adminMode){if($('#guide-replay'))$('#guide-replay').hidden=false;setTimeout(()=>{if(started&&!entryActive&&!tourActive)speakCurator()},450)}}
 function dampAngle(a,b,t){let d=(b-a+Math.PI)%(Math.PI*2)-Math.PI;if(d<-Math.PI)d+=Math.PI*2;return a+d*t}
-function showOverview(){setEntranceDoors(true);activeChildZone=-1;tourActive=false;entryActive=false;zoneTravelActive=false;hasDestination=false;scene.userData.clickMarker.visible=false;overviewMode=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,9.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구'}
+function showOverview(){setEntranceDoors(true);activeChildZone=-1;tourActive=false;setPanoramaPerformanceMode(false);entryActive=false;zoneTravelActive=false;hasDestination=false;scene.userData.clickMarker.visible=false;overviewMode=false;moveVelocity.set(0,0,0);camera.position.set(0,1.65,9.8);yaw=0;pitch=0;camera.fov=72;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='정면 입구'}
 function goToChildZone(ci){
   const layout=ZONE_LAYOUT[ci];activeChildZone=ci;closeIndex();closePoem();if(!started){started=true;$('#intro').classList.add('closed');$('#hud').hidden=false;startAmbientMusic();resetEntrance()}setEntranceDoors(true);
-  entryActive=false;tourActive=false;hasDestination=false;scene.userData.clickMarker.visible=false;moveVelocity.set(0,0,0);moveTarget.set(0,0,0);zoneTravelChild=ci;zoneTravelElapsed=0;zoneTravelActive=true;zoneTravelStart.copy(camera.position);zoneTravelEnd.copy(zoneLocalToWorld(layout,0,4.45));zoneTravelEnd.y=1.65;
+  entryActive=false;tourActive=false;setPanoramaPerformanceMode(false);hasDestination=false;scene.userData.clickMarker.visible=false;moveVelocity.set(0,0,0);moveTarget.set(0,0,0);zoneTravelChild=ci;zoneTravelElapsed=0;zoneTravelActive=true;zoneTravelStart.copy(camera.position);zoneTravelEnd.copy(zoneLocalToWorld(layout,0,4.45));zoneTravelEnd.y=1.65;
   zoneTravelStartRadius=Math.max(3.6,Math.hypot(zoneTravelStart.x,zoneTravelStart.z));zoneTravelEndRadius=Math.hypot(zoneTravelEnd.x,zoneTravelEnd.z);zoneTravelStartAngle=Math.atan2(zoneTravelStart.z,zoneTravelStart.x);const endAngle=Math.atan2(zoneTravelEnd.z,zoneTravelEnd.x);zoneTravelAngleDelta=(endAngle-zoneTravelStartAngle+Math.PI*3)%(Math.PI*2)-Math.PI;zoneTravelStartYaw=yaw;zoneTravelEndYaw=Math.atan2(-(layout.x-zoneTravelEnd.x),-(layout.z-zoneTravelEnd.z));pitch=0;$('#zone-name').textContent=`${children[ci].name}의 방으로 이동 중`
 }
 function updateZoneTravel(dt){
   zoneTravelElapsed=Math.min(ZONE_TRAVEL_DURATION,zoneTravelElapsed+dt);const t=zoneTravelElapsed/ZONE_TRAVEL_DURATION,e=t*t*(3-2*t),angle=zoneTravelStartAngle+zoneTravelAngleDelta*e,radius=THREE.MathUtils.lerp(zoneTravelStartRadius,zoneTravelEndRadius,e);camera.position.set(Math.cos(angle)*radius,1.65,Math.sin(angle)*radius);yaw=dampAngle(zoneTravelStartYaw,zoneTravelEndYaw,e);camera.rotation.set(0,yaw,0);if(t>=1){zoneTravelActive=false;moveTarget.set(0,0,0);camera.position.copy(zoneTravelEnd);camera.rotation.set(0,zoneTravelEndYaw,0);yaw=zoneTravelEndYaw;$('#zone-name').textContent=`${children[zoneTravelChild].name}의 방`}
 }
 function updateMap(){const x=camera.position.x/15*40,z=camera.position.z/13.2*40;$('#map-dot').style.transform=`translate(${x}px,${z}px)`;$('#map-view').style.transform=`rotate(${-yaw}rad)`}
-function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,coarsePointer?1:1.25))}
+function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(tourActive?TOUR_PIXEL_RATIO:BASE_PIXEL_RATIO)}
 
 function getArtworkFrontView(ci,pi){
   const group=frameGroups.get(`${ci}-${pi}`),layout=ZONE_LAYOUT[ci];if(!group||!layout)return null;
