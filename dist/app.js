@@ -39,7 +39,8 @@ const MUSIC_VOLUME=.042;
 const BASE_PIXEL_RATIO=Math.min(devicePixelRatio,coarsePointer?1:1.25);
 const TOUR_PIXEL_RATIO=Math.min(devicePixelRatio,coarsePointer?.58:.68);
 const TOUR_UI_INTERVAL=120;
-const ENTRY_DURATION=5.6;
+const ENTRY_DURATION=6.1;
+const DOOR_OPEN_START=.08,DOOR_OPEN_END=.5,ENTRY_WALK_START=.46;
 const DOOR_OPEN_ANGLE=Math.PI*.495;
 const ZONE_TRAVEL_DURATION=1.55;
 const CURATOR_DIRECTION_DAMPING=3.2;
@@ -358,10 +359,10 @@ function hideEntryPortal(immediate=false){
   const portal=$('#entry-portal');clearTimeout(entryPortalOpenTimer);clearTimeout(entryPortalHideTimer);entryPortalOpenTimer=entryPortalHideTimer=null;if(!portal)return;portal.classList.remove('active');if(immediate)portal.classList.remove('open');else setTimeout(()=>portal.classList.remove('open'),420)
 }
 function startEntrySequence(){
-  activeChildZone=-1;hasDestination=false;tourActive=false;zoneTravelActive=false;entryActive=true;entryElapsed=0;entryStartedAt=performance.now();moveVelocity.set(0,0,0);$('#hud').classList.add('cinematic');const curator=scene.userData.curator,shadow=scene.userData.curatorShadow;if(curator)curator.visible=false;if(shadow)shadow.visible=false;document.body.dataset.curatorState='hidden';setEntranceDoors(false);if(scene.userData.entranceFacade)scene.userData.entranceFacade.visible=true;(scene.userData.entranceWalls||[]).forEach(wall=>wall.visible=true);camera.position.set(0,1.68,16.5);yaw=0;pitch=0;camera.fov=68;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='전시장 입구'
+  activeChildZone=-1;hasDestination=false;tourActive=false;zoneTravelActive=false;entryActive=true;entryElapsed=0;entryStartedAt=performance.now();moveVelocity.set(0,0,0);$('#hud').classList.add('cinematic');const curator=scene.userData.curator,shadow=scene.userData.curatorShadow;if(curator)curator.visible=false;if(shadow)shadow.visible=false;document.body.dataset.curatorState='hidden';document.body.dataset.doorOpenDuration=((DOOR_OPEN_END-DOOR_OPEN_START)*ENTRY_DURATION).toFixed(2);document.body.dataset.entryWalkStart=(ENTRY_WALK_START*ENTRY_DURATION).toFixed(2);setEntranceDoors(false);if(scene.userData.entranceFacade)scene.userData.entranceFacade.visible=true;(scene.userData.entranceWalls||[]).forEach(wall=>wall.visible=true);camera.position.set(0,1.68,16.5);yaw=0;pitch=0;camera.fov=68;camera.updateProjectionMatrix();camera.rotation.set(0,0,0);$('#zone-name').textContent='전시장 입구'
 }
 function updateEntrySequence(dt){
-  entryElapsed=Math.min(ENTRY_DURATION,(performance.now()-entryStartedAt)/1000);const t=entryElapsed/ENTRY_DURATION,doorT=THREE.MathUtils.smoothstep(THREE.MathUtils.clamp((t-.08)/.34,0,1),0,1),walkT=THREE.MathUtils.smoothstep(THREE.MathUtils.clamp((t-.42)/.58,0,1),0,1);setEntranceDoors(true,doorT);camera.position.z=THREE.MathUtils.lerp(16.5,11.2,walkT);camera.position.y=1.68+Math.sin(walkT*Math.PI)*.025;camera.fov=THREE.MathUtils.lerp(68,72,walkT);camera.updateProjectionMatrix();camera.rotation.set(0,0,0);if(t>=1){entryActive=false;setEntranceDoors(true);$('#hud').classList.remove('cinematic');camera.position.set(0,1.68,11.2);camera.fov=72;camera.updateProjectionMatrix();startPanoramaTour()}
+  entryElapsed=Math.min(ENTRY_DURATION,(performance.now()-entryStartedAt)/1000);const t=entryElapsed/ENTRY_DURATION,doorT=THREE.MathUtils.smoothstep(THREE.MathUtils.clamp((t-DOOR_OPEN_START)/(DOOR_OPEN_END-DOOR_OPEN_START),0,1),0,1),walkT=THREE.MathUtils.smoothstep(THREE.MathUtils.clamp((t-ENTRY_WALK_START)/(1-ENTRY_WALK_START),0,1),0,1);setEntranceDoors(true,doorT);camera.position.z=THREE.MathUtils.lerp(16.5,11.2,walkT);camera.position.y=1.68+Math.sin(walkT*Math.PI)*.025;camera.fov=THREE.MathUtils.lerp(68,72,walkT);camera.updateProjectionMatrix();camera.rotation.set(0,0,0);if(t>=1){entryActive=false;setEntranceDoors(true);$('#hud').classList.remove('cinematic');camera.position.set(0,1.68,11.2);camera.fov=72;camera.updateProjectionMatrix();startPanoramaTour()}
 }
 function startPanoramaTour(){
   setEntranceDoors(true);hasDestination=false;moveVelocity.set(0,0,0);tourElapsed=0;tourStartedAt=performance.now();tourUiUpdatedAt=0;tourFrameCount=0;tourFrameStartedAt=tourStartedAt;tourActive=!reduceMotion;setPanoramaPerformanceMode(tourActive);camera.fov=74;camera.updateProjectionMatrix();camera.position.set(0,2.08,8.2);yaw=0;pitch=-.03;camera.rotation.set(pitch,yaw,0);document.body.dataset.panoramaMotion=reduceMotion?'skipped':'continuous';if(reduceMotion)finishPanoramaTour()
