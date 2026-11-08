@@ -34,7 +34,7 @@
 
   <section id="intro" class="intro" aria-labelledby="intro-title">
     <div class="intro-illustrations" aria-hidden="true"><img class="intro-tree" src="assets/centerpiece-tree.png" alt=""><img class="intro-curator" src="assets/curator-maru.png" alt=""><img class="intro-mobile" src="assets/cotton-mobile.png" alt=""></div>
-    <div class="admin-intro-actions"><span class="admin-badge">관리자 모드</span><a class="admin-view-link" href="/">사용자 화면 보기</a></div>
+    <div class="admin-intro-actions"><span class="admin-badge">관리자 모드</span><a class="admin-view-link" href="/">사용자 화면 보기</a><button class="admin-logout" type="button" data-admin-logout>관리 종료</button></div>
     <p class="kicker">전시장 관리자 모드</p>
     <h1 id="intro-title"><em>햇살</em><br>동시 마루</h1>
     <p>전시장 이름·배경·액자와<br>아이들의 동시 원본을 관리하세요.</p>
@@ -48,6 +48,7 @@
       <div class="zone-label"><small>관리자 미리보기</small><strong id="zone-name">중앙 홀</strong></div>
       <div class="top-actions">
         <a class="admin-view-link admin-view-link-top" href="/">사용자 화면</a>
+        <button class="admin-logout admin-logout-top" type="button" data-admin-logout>관리 종료</button>
         <button id="music-toggle" class="music-button" type="button" aria-label="전시 음악 끄기" aria-pressed="true"><img class="music-icon" src="assets/ui-music.png" alt="" aria-hidden="true"><span>음악</span></button>
         <button id="overview" class="icon-button" type="button" aria-label="정면 입구 시점으로 이동"><img class="button-icon" src="assets/ui-overview.png" alt="" aria-hidden="true"></button>
         <button id="settings-open" class="icon-button settings-button" type="button" aria-label="전시장 설정">설정</button>
@@ -91,10 +92,14 @@
     <header><div><small>전시 편집</small><h2 id="settings-title">전시장 설정</h2></div><button id="settings-close" class="close-button" type="button" aria-label="설정 닫기"><img src="assets/ui-close.png" alt="" aria-hidden="true"></button></header>
     <section class="gallery-config" aria-labelledby="gallery-config-title">
       <h3 id="gallery-config-title">전시장 기본 설정</h3>
-      <label class="name-field" for="gallery-name"><span>메인 타이틀 제목</span><div class="name-control"><input id="gallery-name" type="text" maxlength="30" placeholder="예: 우리 반 동시 전시회" autocomplete="off"><button id="gallery-name-apply" type="button">제목 저장</button></div><small>‘햇살 동시 마루’ 대신 원하는 제목을 입력하세요. 첫 화면과 전시장 상단 제목에 함께 반영됩니다.</small></label>
-      <label class="child-count-field" for="child-count"><span>참여 어린이 수</span><div class="child-count-control"><input id="child-count" type="number" min="1" max="12" step="1" inputmode="numeric"><button id="child-count-apply" type="button">인원 적용</button></div><small>기본 10명이며, 1명부터 12명까지 설정할 수 있습니다. 적용하면 전시 구역과 작품 목록이 함께 바뀝니다.</small></label>
+      <label class="name-field" for="gallery-name"><span>메인 타이틀 제목</span><div class="name-control"><input id="gallery-name" type="text" maxlength="30" placeholder="예: 우리 반 동시 전시회" autocomplete="off"></div><small>‘햇살 동시 마루’ 대신 원하는 제목을 입력하세요. 아래의 전체 저장 버튼을 누르면 첫 화면과 전시장 상단에 함께 반영됩니다.</small></label>
+      <label class="child-count-field" for="child-count"><span>참여 어린이 수</span><div class="child-count-control"><input id="child-count" type="number" min="1" max="12" step="1" inputmode="numeric"></div><small>기본 10명이며, 1명부터 12명까지 설정할 수 있습니다. 전체 저장 후 전시 구역과 작품 목록이 함께 바뀝니다.</small></label>
       <fieldset class="theme-field"><legend>전시장 배경</legend><div class="theme-options"><button type="button" data-theme-choice="warm" aria-pressed="false"><i class="theme-preview warm" aria-hidden="true"></i><strong>따뜻한 원목</strong><span>햇살과 밝은 마루</span></button><button type="button" data-theme-choice="storybook" aria-pressed="false"><i class="theme-preview storybook" aria-hidden="true"></i><strong>그림책 원화전</strong><span>크림 벽과 파스텔 전시</span></button></div></fieldset>
       <p>두 배경 모두 실제 문을 열고 입장합니다. 그림책 원화전 배경은 크림색 종이 벽, 파스텔 전시 면, 낮은 원목 진열대와 부드러운 조명을 사용합니다.</p>
+    </section>
+    <section class="settings-save-bar" aria-label="전체 설정 저장">
+      <div><strong>모든 설정을 한 번에 저장</strong><span id="settings-save-state">아이 이름과 현재 설정을 모두 확인해 주세요.</span></div>
+      <button id="settings-save-all" type="button">전체 설정 저장하고 전시장 보기</button>
     </section>
     <section class="password-config" aria-labelledby="password-config-title">
       <h3 id="password-config-title">관리자 비밀번호 변경</h3>
@@ -113,6 +118,6 @@
     <div id="settings-list" class="settings-list"></div>
   </aside>
 
-  <script type="module" src="app.js?v=102"></script>
+  <script type="module" src="app.js?v=104"></script>
 </body>
 </html>
