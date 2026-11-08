@@ -106,8 +106,8 @@ async function initAdminAuth(){
 function resumeAdminGallery(){
   sessionStorage.removeItem(ADMIN_RESUME_KEY);started=true;modalOpen=false;entryActive=false;tourActive=false;zoneTravelActive=false;hasDestination=false;hideEntryPortal(true);$('#intro').classList.add('closed');$('#hud').hidden=false;$('#hud').classList.remove('cinematic');showOverview();document.body.dataset.adminResume='gallery';setScanStatus('전체 설정을 저장했습니다. 관리자 전시장으로 돌아왔어요.')
 }
-function endAdminSession(){
-  if(!adminMode)return;sessionStorage.removeItem(ADMIN_SESSION_KEY);sessionStorage.removeItem(ADMIN_RESUME_KEY);location.replace('/admin/')
+function exitAdminToVisitor(event){
+  if(!adminMode)return;event?.preventDefault();sessionStorage.removeItem(ADMIN_SESSION_KEY);sessionStorage.removeItem(ADMIN_RESUME_KEY);location.replace('/')
 }
 
 function buildGallery(){
@@ -250,7 +250,7 @@ function bind(){
   if($('#cheer-message'))$('#cheer-message').oninput=()=>{$('#cheer-length').textContent=String($('#cheer-message').value.length)};
   if($('#cheer-form')&&!adminMode)$('#cheer-form').onsubmit=submitCheerMessage;
   addEventListener('storage',event=>{if(event.key!==CHEER_STORAGE_KEY)return;refreshCheerCards();renderCheerSection(selectedChild,selectedPoem);renderCheerAdmin()});
-  if($('#overview'))$('#overview').onclick=showOverview;$('#index-open').onclick=openIndex;$('#index-close').onclick=closeIndex;if(adminMode){$('#settings-open').onclick=openSettings;$('#settings-close').onclick=closeSettings;$('#password-open').onclick=openPasswordModal;$('#password-close').onclick=closePasswordModal;$$('[data-password-close]').forEach(button=>button.onclick=closePasswordModal);$$('[data-admin-logout]').forEach(button=>button.onclick=endAdminSession)}
+  if($('#overview'))$('#overview').onclick=()=>{if(adminMode&&$('#settings-panel').classList.contains('open'))closeSettings();showOverview()};$('#index-open').onclick=openIndex;$('#index-close').onclick=closeIndex;if(adminMode){$('#settings-open').onclick=openSettings;$('#settings-close').onclick=closeSettings;$('#password-open').onclick=openPasswordModal;$('#password-close').onclick=closePasswordModal;$$('[data-password-close]').forEach(button=>button.onclick=closePasswordModal);$$('[data-admin-exit]').forEach(link=>link.onclick=exitAdminToVisitor)}
   $$('[data-close]').forEach(b=>b.onclick=closePoem);
   $('#prev-poem').onclick=()=>movePoem(-1);$('#next-poem').onclick=()=>movePoem(1);
 }
@@ -324,7 +324,7 @@ function playAmbientChord(){
   [1,1.5].forEach((ratio,i)=>{const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type='sine';osc.frequency.value=roots[index]*ratio;gain.gain.setValueAtTime(.0001,now);gain.gain.exponentialRampToValueAtTime(i?.008:.012,now+.55);gain.gain.exponentialRampToValueAtTime(.0001,now+4.9);osc.connect(gain).connect(audioMaster);osc.start(now);osc.stop(now+5)});
   phrases[index].forEach((frequency,i)=>{const start=now+.22+i*.48;[[1,.026,'sine'],[2,.007,'triangle']].forEach(([ratio,peak,type])=>{const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=type;osc.frequency.value=frequency*ratio;gain.gain.setValueAtTime(.0001,start);gain.gain.exponentialRampToValueAtTime(peak,start+.045);gain.gain.exponentialRampToValueAtTime(.0001,start+1.22);osc.connect(gain).connect(audioMaster);osc.start(start);osc.stop(start+1.28)})});
 }
-function updateMusicButton(){const b=$('#music-toggle');if(!b)return;b.classList.toggle('muted',!musicOn);b.setAttribute('aria-pressed',String(musicOn));b.setAttribute('aria-label',musicOn?'전시 음악 끄기':'전시 음악 켜기')}
+function updateMusicButton(){const b=$('#music-toggle');if(!b)return;b.classList.toggle('muted',!musicOn);b.setAttribute('aria-pressed',String(musicOn));b.setAttribute('aria-label',musicOn?'전시 음악 끄기':'전시 음악 켜기');const status=b.querySelector('[data-music-status]');if(status)status.textContent=musicOn?'켜짐 · 누르면 끄기':'꺼짐 · 누르면 켜기'}
 function updateZone(){
   if(Math.abs(camera.position.x)<5.2&&Math.abs(camera.position.z)<5.2){activeChildZone=-1;$('#zone-name').textContent='중앙 햇살 통로';return}
   if(activeChildZone>=0){const zone=ZONE_LAYOUT[activeChildZone],d=(camera.position.x-zone.x)**2+(camera.position.z-zone.z)**2;if(d<64){$('#zone-name').textContent=`${children[activeChildZone].name}의 방`;return}}

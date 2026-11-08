@@ -15,7 +15,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
   <script>try{const c=JSON.parse(localStorage.getItem('sunnyPoemAdminCredential')||'null');if(c?.hash&&sessionStorage.getItem('sunnyPoemAdminSession')===c.hash)document.documentElement.classList.add('admin-session-active')}catch{}</script>
   <style>html.admin-session-active .admin-auth-gate{display:none!important}</style>
-  <link rel="stylesheet" href="styles.css?v=105">
+  <link rel="stylesheet" href="styles.css?v=109">
 </head>
 <body data-admin="true" class="admin-mode">
   <a class="skip" href="#settings-panel">3D 전시를 건너뛰고 설정 열기</a>
@@ -28,7 +28,7 @@
       <label id="admin-auth-confirm-wrap" hidden><span>비밀번호 확인</span><input id="admin-auth-confirm" type="password" minlength="6" autocomplete="new-password"></label>
       <p id="admin-auth-error" class="admin-auth-error" role="alert" aria-live="polite"></p>
       <button id="admin-auth-submit" type="submit">관리자 모드 들어가기</button>
-      <a href="/">사용자 화면으로 돌아가기</a>
+      <a href="/" data-admin-exit>사용자 화면으로 돌아가기</a>
     </form>
   </section>
   <canvas id="gallery-canvas" aria-label="클릭·드래그·마우스 휠로 자유롭게 이동하며 설정을 미리 볼 수 있는 3D 작품 전시장"></canvas>
@@ -36,7 +36,7 @@
 
   <section id="intro" class="intro" aria-labelledby="intro-title">
     <div class="intro-illustrations" aria-hidden="true"><img class="intro-tree" src="assets/centerpiece-tree.png" alt=""><img class="intro-curator" src="assets/curator-maru.png" alt=""><img class="intro-mobile" src="assets/cotton-mobile.png" alt=""></div>
-    <div class="admin-intro-actions"><span class="admin-badge">관리자 모드</span><a class="admin-view-link" href="/">사용자 화면 보기</a><button class="admin-logout" type="button" data-admin-logout>관리 종료</button></div>
+    <div class="admin-intro-actions"><span class="admin-badge">관리자 모드</span><a class="admin-view-link" href="/" data-admin-exit>사용자 화면 보기</a></div>
     <p class="kicker">전시장 관리자 모드</p>
     <h1 id="intro-title"><em>햇살</em><br>동시 마루</h1>
     <p>전시장 이름·배경·액자와<br>아이들의 동시 원본을 관리하세요.</p>
@@ -49,10 +49,7 @@
       <button id="home" class="logo" type="button" aria-label="관리자 입구로 돌아가기"><img class="brand-mark" src="assets/ui-sun-mark.png" alt="" aria-hidden="true"><span>햇살 동시 마루</span></button>
       <div class="zone-label"><small>관리자 미리보기</small><strong id="zone-name">중앙 홀</strong></div>
       <div class="top-actions">
-        <a class="admin-view-link admin-view-link-top" href="/">사용자 화면</a>
-        <button class="admin-logout admin-logout-top" type="button" data-admin-logout>관리 종료</button>
-        <button id="music-toggle" class="music-button" type="button" aria-label="전시 음악 끄기" aria-pressed="true"><img class="music-icon" src="assets/ui-music.png" alt="" aria-hidden="true"><span>음악</span></button>
-        <button id="overview" class="icon-button" type="button" aria-label="정면 입구 시점으로 이동"><img class="button-icon" src="assets/ui-overview.png" alt="" aria-hidden="true"></button>
+        <a class="admin-view-link admin-view-link-top" href="/" data-admin-exit>사용자 화면</a>
         <button id="settings-open" class="icon-button settings-button" type="button" aria-label="전시장 설정">설정</button>
         <button id="index-open" class="icon-button" type="button" aria-label="전체 작품 목록"><img class="button-icon" src="assets/ui-menu.png" alt="" aria-hidden="true"></button>
       </div>
@@ -99,6 +96,19 @@
       <fieldset class="theme-field"><legend>전시장 배경</legend><div class="theme-options"><button type="button" data-theme-choice="warm" aria-pressed="false"><i class="theme-preview warm" aria-hidden="true"></i><strong>따뜻한 원목</strong><span>햇살과 밝은 마루</span></button><button type="button" data-theme-choice="storybook" aria-pressed="false"><i class="theme-preview storybook" aria-hidden="true"></i><strong>그림책 원화전</strong><span>크림 벽과 파스텔 전시</span></button></div></fieldset>
       <p>두 배경 모두 실제 문을 열고 입장합니다. 그림책 원화전 배경은 크림색 종이 벽, 파스텔 전시 면, 낮은 원목 진열대와 부드러운 조명을 사용합니다.</p>
     </section>
+    <section class="settings-tools" aria-labelledby="settings-tools-title">
+      <div class="settings-tools-heading"><div><small>관람 화면</small><h3 id="settings-tools-title">화면과 음악</h3></div><span>필요할 때만 사용하세요</span></div>
+      <div class="settings-tool-grid">
+        <button id="music-toggle" class="settings-tool-button" type="button" aria-label="전시 음악 끄기" aria-pressed="true">
+          <span class="settings-tool-icon"><img class="music-icon" src="assets/ui-music.png" alt="" aria-hidden="true"></span>
+          <span class="settings-tool-copy"><strong>전시 음악</strong><small data-music-status>켜짐 · 누르면 끄기</small></span>
+        </button>
+        <button id="overview" class="settings-tool-button" type="button" aria-label="정면 입구 시점으로 이동">
+          <span class="settings-tool-icon"><img src="assets/ui-overview.png" alt="" aria-hidden="true"></span>
+          <span class="settings-tool-copy"><strong>정면 입구 보기</strong><small>카메라를 입구 시점으로 이동</small></span>
+        </button>
+      </div>
+    </section>
     <section class="cheer-admin" aria-labelledby="cheer-admin-title">
       <div class="cheer-admin-heading"><div><small>보호자·관람객 메시지</small><h3 id="cheer-admin-title">응원 메시지 관리</h3></div><span id="cheer-pending-count">전체 0개</span></div>
       <p>응원은 작성 즉시 사용자 화면에 공개됩니다. 부적절하거나 개인정보가 포함된 문구는 숨기거나 삭제해 주세요.</p>
@@ -124,6 +134,6 @@
     </div>
   </section>
 
-  <script type="module" src="app.js?v=108"></script>
+  <script type="module" src="app.js?v=109"></script>
 </body>
 </html>
