@@ -22,7 +22,7 @@ const CHEER_BOARD_WIDTH=5.05,CHEER_BOARD_HEIGHT=1.08;
 const ARTWORK_INTERACTION_DISTANCE=10,ARTWORK_FRONT_DISTANCE=3.55,ARTWORK_FRONT_FOV=58;
 const canvas=$('#gallery-canvas');
 let scene,camera,renderer,clock,raycaster,frameMeshes=[],navigationMeshes=[],yaw=0,pitch=0,started=false,modalOpen=false,overviewMode=false;
-let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,dragMode=null,dragStartX=0,dragStartY=0,lastX=0,lastY=0,keys={};
+let selectedChild=0,selectedPoem=0,dragging=false,dragMoved=false,dragMode=null,dragStartX=0,dragStartY=0,lastX=0,lastY=0,keys={},pointerMoveActive=false,curatorPointerIdle=false;
 let tourActive=false,tourElapsed=0,tourStartedAt=0,entryActive=false,entryElapsed=0,entryStartedAt=0,hasDestination=false,zoneTravelActive=false,zoneTravelElapsed=0;
 let activeChildZone=-1,lastFocusedArtwork=null;
 let destinationTurnsView=true;
@@ -236,9 +236,9 @@ function bind(){
   addEventListener('resize',resize);
   addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key==='Escape'){if(adminMode&&!$('#password-modal').hidden){closePasswordModal();return}closePoem();closeIndex();if(adminMode)closeSettings();stopGuideVoice()}});
   addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
-  canvas.addEventListener('pointerdown',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;e.preventDefault();dragging=true;dragMoved=false;dragMode=null;dragStartX=lastX=e.clientX;dragStartY=lastY=e.clientY;canvas.classList.add('is-dragging');canvas.setPointerCapture(e.pointerId)});
-  canvas.addEventListener('pointermove',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive||!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY,totalX=e.clientX-dragStartX,totalY=e.clientY-dragStartY;if(Math.hypot(totalX,totalY)>DRAG_THRESHOLD){dragMoved=true;if(!dragMode)dragMode=e.shiftKey||Math.abs(totalX)>=Math.abs(totalY)*.9?'look':'move'}if(dragMode==='move'){queueDirectionalMove(-dy*.016);canvas.classList.add('is-moving-drag')}else if(dragMode==='look'){yaw-=dx*.0038;pitch=THREE.MathUtils.clamp(pitch-dy*.0028,PITCH_MIN,PITCH_MAX);camera.rotation.set(pitch,yaw,0)}lastX=e.clientX;lastY=e.clientY});
-  const finishDrag=e=>{if(dragging&&!dragMoved&&e?.type==='pointerup')handleWorldClick(e.clientX,e.clientY);dragging=false;dragMode=null;canvas.classList.remove('is-dragging','is-moving-drag')};
+  canvas.addEventListener('pointerdown',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;e.preventDefault();const action=handleWorldClick(e.clientX,e.clientY);if(action==='artwork')return;dragging=true;dragMoved=false;dragMode=null;pointerMoveActive=action==='move';curatorPointerIdle=false;document.body.dataset.pressMove=pointerMoveActive?'moving':'ready';dragStartX=lastX=e.clientX;dragStartY=lastY=e.clientY;canvas.classList.add('is-dragging');canvas.setPointerCapture(e.pointerId)});
+  canvas.addEventListener('pointermove',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive||!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY,totalX=e.clientX-dragStartX,totalY=e.clientY-dragStartY;if(Math.hypot(totalX,totalY)>DRAG_THRESHOLD){dragMoved=true;if(!dragMode)dragMode=e.shiftKey||Math.abs(totalX)>=Math.abs(totalY)*.9?'look':'move'}if(dragMode==='move'){pointerMoveActive=true;curatorPointerIdle=false;document.body.dataset.pressMove='moving';queueDirectionalMove(-dy*.016);canvas.classList.add('is-moving-drag')}else if(dragMode==='look'){if(pointerMoveActive)stopPressedMovement();yaw-=dx*.0038;pitch=THREE.MathUtils.clamp(pitch-dy*.0028,PITCH_MIN,PITCH_MAX);camera.rotation.set(pitch,yaw,0)}lastX=e.clientX;lastY=e.clientY});
+  const finishDrag=()=>{if(pointerMoveActive||dragMode==='move')stopPressedMovement();dragging=false;dragMode=null;canvas.classList.remove('is-dragging','is-moving-drag')};
   canvas.addEventListener('pointerleave',finishDrag);canvas.addEventListener('pointercancel',finishDrag);canvas.addEventListener('lostpointercapture',finishDrag);canvas.addEventListener('pointerup',finishDrag);
   canvas.addEventListener('wheel',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;e.preventDefault();if(e.shiftKey){pitch=THREE.MathUtils.clamp(pitch-e.deltaY*.0007,PITCH_MIN,PITCH_MAX);camera.rotation.x=pitch;return}const distance=THREE.MathUtils.clamp(-e.deltaY*.01,-1.4,1.4);if(Math.abs(distance)>.03)queueDirectionalMove(distance)},{passive:false});
   $('#enter').onclick=()=>{started=true;startAmbientMusic();primeGuideAudio();hideEntryPortal(true);$('#intro').classList.add('closed');$('#hud').hidden=false;startEntrySequence()};
@@ -260,7 +260,7 @@ function animate(){
     if(entryActive){updateEntrySequence(dt);updateMap()}else if(tourActive){updatePanoramaTour(dt);const nowMs=performance.now();if(nowMs-tourUiUpdatedAt>=TOUR_UI_INTERVAL){tourUiUpdatedAt=nowMs;updateZone();updateMap()}}else if(zoneTravelActive){updateZoneTravel(dt);updateMap()}else{
       const forward=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0);
       const side=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0);
-      if(forward||side){hasDestination=false;scene.userData.clickMarker.visible=false;moveTarget.set(-Math.sin(yaw)*forward+Math.cos(yaw)*side,0,-Math.cos(yaw)*forward-Math.sin(yaw)*side);if(moveTarget.lengthSq()>1)moveTarget.normalize();moveTarget.multiplyScalar(MANUAL_MOVE_SPEED)}
+      if(forward||side){curatorPointerIdle=false;hasDestination=false;scene.userData.clickMarker.visible=false;moveTarget.set(-Math.sin(yaw)*forward+Math.cos(yaw)*side,0,-Math.cos(yaw)*forward-Math.sin(yaw)*side);if(moveTarget.lengthSq()>1)moveTarget.normalize();moveTarget.multiplyScalar(MANUAL_MOVE_SPEED)}
       else if(hasDestination){
         moveTarget.set(moveDestination.x-camera.position.x,0,moveDestination.z-camera.position.z);const distance=moveTarget.length();
         if(distance<=CLICK_STOP_RADIUS){camera.position.x=moveDestination.x;camera.position.z=moveDestination.z;hasDestination=false;scene.userData.clickMarker.visible=false;moveTarget.set(0,0,0);moveVelocity.set(0,0,0)}
@@ -281,14 +281,14 @@ function updateCurator(dt,now){
   const curator=scene.userData.curator,shadow=scene.userData.curatorShadow;if(!curator)return;
   const hidden=!started||entryActive||tourActive;curator.visible=!hidden;if(shadow)shadow.visible=!hidden;if(hidden){curatorLastCameraPosition.copy(camera.position);document.body.dataset.curatorMotion='hidden';return}
   if(modalOpen){curatorLastCameraPosition.copy(camera.position);document.body.dataset.curatorMotion='frozen';return}
-  const activeLayout=activeChildZone>=0?ZONE_LAYOUT[activeChildZone]:null,activeDistanceSq=activeLayout?(camera.position.x-activeLayout.x)**2+(camera.position.z-activeLayout.z)**2:Infinity,anchoredToZone=!!activeLayout&&activeDistanceSq<64,rightX=Math.cos(yaw),rightZ=-Math.sin(yaw),forwardX=-Math.sin(yaw),forwardZ=-Math.cos(yaw),manualInput=!!(keys.w||keys.a||keys.s||keys.d||keys.arrowup||keys.arrowdown||keys.arrowleft||keys.arrowright);
-  curatorCameraDelta.copy(camera.position).sub(curatorLastCameraPosition);curatorCameraDelta.y=0;const cameraMoving=curatorCameraDelta.lengthSq()>.000004,movingWithCamera=zoneTravelActive||hasDestination||manualInput||cameraMoving||moveVelocity.lengthSq()>.01;
-  if(movingWithCamera){const followDistance=anchoredToZone?2.35:3;curatorTarget.set(camera.position.x+forwardX*followDistance,anchoredToZone?.79:.96,camera.position.z+forwardZ*followDistance)}
+  const activeLayout=activeChildZone>=0?ZONE_LAYOUT[activeChildZone]:null,activeDistanceSq=activeLayout?(camera.position.x-activeLayout.x)**2+(camera.position.z-activeLayout.z)**2:Infinity,anchoredToZone=!!activeLayout&&activeDistanceSq<64,rightX=Math.cos(yaw),rightZ=-Math.sin(yaw),forwardX=-Math.sin(yaw),forwardZ=-Math.cos(yaw),manualInput=!!(keys.w||keys.a||keys.s||keys.d||keys.arrowup||keys.arrowdown||keys.arrowleft||keys.arrowright),forcePointerIdle=curatorPointerIdle&&!zoneTravelActive&&!hasDestination&&!manualInput;
+  curatorCameraDelta.copy(camera.position).sub(curatorLastCameraPosition);curatorCameraDelta.y=0;const cameraMoving=!forcePointerIdle&&curatorCameraDelta.lengthSq()>.000004,movingWithCamera=!forcePointerIdle&&(zoneTravelActive||hasDestination||manualInput||cameraMoving||moveVelocity.lengthSq()>.01);
+  if(forcePointerIdle)curatorTarget.copy(curator.position);else if(movingWithCamera){const followDistance=anchoredToZone?2.35:3;curatorTarget.set(camera.position.x+forwardX*followDistance,anchoredToZone?.79:.96,camera.position.z+forwardZ*followDistance)}
   else if(anchoredToZone){const forwardDistance=coarsePointer?2.65:2.5,sideDistance=coarsePointer?1.45:2.1;curatorTarget.set(camera.position.x+forwardX*forwardDistance+rightX*sideDistance,.79,camera.position.z+forwardZ*forwardDistance+rightZ*sideDistance)}
   else curatorTarget.set(camera.position.x+forwardX*3,.96,camera.position.z+forwardZ*3);
   curatorTarget.x=THREE.MathUtils.clamp(curatorTarget.x,-13.15,13.15);curatorTarget.z=THREE.MathUtils.clamp(curatorTarget.z,-11.45,11.45);
   curatorPositionDelta.copy(curatorTarget).sub(curator.position);curatorPositionDelta.y=0;const forceForward=zoneTravelActive||(hasDestination&&destinationTurnsView);if(forceForward)curatorMotionVector.set(forwardX,0,forwardZ);else if(cameraMoving)curatorMotionVector.copy(curatorCameraDelta).normalize();else if(moveTarget.lengthSq()>.01)curatorMotionVector.copy(moveTarget).normalize();else if(curatorPositionDelta.lengthSq()>.0004)curatorMotionVector.copy(curatorPositionDelta).normalize();else curatorMotionVector.set(0,0,0);
-  const walking=movingWithCamera||curatorPositionDelta.lengthSq()>.0225,smoothedMotion=curator.userData.smoothedMotion;
+  const walking=!forcePointerIdle&&(movingWithCamera||curatorPositionDelta.lengthSq()>.0225),smoothedMotion=curator.userData.smoothedMotion;
   if(curatorMotionVector.lengthSq()>.0001){const directionAlpha=1-Math.exp(-CURATOR_DIRECTION_DAMPING*dt);if(smoothedMotion.lengthSq()<.0001)smoothedMotion.copy(curatorMotionVector);else smoothedMotion.lerp(curatorMotionVector,directionAlpha);smoothedMotion.normalize()}
   const screenX=smoothedMotion.x*rightX+smoothedMotion.z*rightZ,depth=smoothedMotion.x*forwardX+smoothedMotion.z*forwardZ,desiredFacing=resolveCuratorFacing(walking,forceForward,screenX,depth),turnState=settleCuratorFacing(curator,desiredFacing,screenX,now,walking),facing=turnState.facing,step=Math.floor(now*4.2)%2?'A':'B',tex=walking?curator.userData.textures[`${facing}${step}`]:facing==='front'?curator.userData.textures.idle:curator.userData.textures[`${facing}A`];
   const zoneScaleX=anchoredToZone?1.05:1.28;curator.scale.set(facing==='side'&&turnState.sideSign>0?-zoneScaleX:zoneScaleX,anchoredToZone?1.58:1.92,1);document.body.dataset.curatorFacing=facing;document.body.dataset.curatorDesiredFacing=desiredFacing;document.body.dataset.curatorTurnState=curator.userData.facingCandidate===facing?'steady':'settling';document.body.dataset.curatorMotion=walking?'walking':'idle';document.body.dataset.curatorZoneSide=anchoredToZone&&!movingWithCamera?'right':'follow';
@@ -336,21 +336,22 @@ function updateFocus(){
 }
 function activateCenter(){if(camera.userData.focus){const d=camera.userData.focus.userData;openPoem(d.child,d.poem)}}
 function setMoveDestination(target,turnsView=true,showMarker=true){
-  moveDestination.copy(target);moveDestination.y=0;constrainWalkPosition(moveDestination);destinationTurnsView=turnsView;const distance=Math.hypot(moveDestination.x-camera.position.x,moveDestination.z-camera.position.z);hasDestination=distance>CLICK_STOP_RADIUS;moveVelocity.multiplyScalar(.2);const marker=scene.userData.clickMarker;marker.position.set(moveDestination.x,.018,moveDestination.z);marker.visible=showMarker&&hasDestination;if(!hasDestination)moveVelocity.set(0,0,0)
+  curatorPointerIdle=false;moveDestination.copy(target);moveDestination.y=0;constrainWalkPosition(moveDestination);destinationTurnsView=turnsView;const distance=Math.hypot(moveDestination.x-camera.position.x,moveDestination.z-camera.position.z);hasDestination=distance>CLICK_STOP_RADIUS;moveVelocity.multiplyScalar(.2);const marker=scene.userData.clickMarker;marker.position.set(moveDestination.x,.018,moveDestination.z);marker.visible=showMarker&&hasDestination;if(!hasDestination)moveVelocity.set(0,0,0)
 }
+function stopPressedMovement(){pointerMoveActive=false;hasDestination=false;moveTarget.set(0,0,0);moveVelocity.set(0,0,0);scene.userData.clickMarker.visible=false;curatorPointerIdle=true;document.body.dataset.pressMove='stopped';document.body.dataset.pressStopSpeed=moveVelocity.length().toFixed(3);document.body.dataset.pressHasDestination=String(hasDestination)}
 function queueDirectionalMove(distance){
-  if(!Number.isFinite(distance)||Math.abs(distance)<.001)return;const direction=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw)),base=hasDestination&&!destinationTurnsView?moveDestination:camera.position,target=base.clone().addScaledVector(direction,distance);setMoveDestination(target,false,false)
+  if(!Number.isFinite(distance)||Math.abs(distance)<.001)return;curatorPointerIdle=false;const direction=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw)),base=hasDestination&&!destinationTurnsView?moveDestination:camera.position,target=base.clone().addScaledVector(direction,distance);setMoveDestination(target,false,false)
 }
 function handleWorldClick(x,y){
-  const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height||x<rect.left||x>rect.right||y<rect.top||y>rect.bottom)return;
+  const rect=canvas.getBoundingClientRect();if(!rect.width||!rect.height||x<rect.left||x>rect.right||y<rect.top||y>rect.bottom)return'none';
   clickPoint.set((x-rect.left)/rect.width*2-1,-((y-rect.top)/rect.height*2-1));raycaster.setFromCamera(clickPoint,camera);
   const subject=raycaster.intersectObjects(frameMeshes,false)[0],navigationHit=raycaster.intersectObjects(navigationMeshes,false)[0],floorHit=raycaster.intersectObject(scene.userData.floor,false)[0];
-  if(subject&&subject.distance<ARTWORK_INTERACTION_DISTANCE){const d=subject.object.userData;openPoem(d.child,d.poem);return}
+  if(subject&&subject.distance<ARTWORK_INTERACTION_DISTANCE){const d=subject.object.userData;openPoem(d.child,d.poem);return'artwork'}
   const nearestDistance=Math.min(navigationHit?.distance??Infinity,floorHit?.distance??Infinity);
-  if(navigationHit&&navigationHit.distance===nearestDistance){setMoveDestination(navigationHit.object.userData.target,true,true);return}
-  if(floorHit){setMoveDestination(floorHit.point,true,true);return}
-  if(raycaster.ray.intersectPlane(groundPlane,groundHitPoint)){setMoveDestination(groundHitPoint,true,true);return}
-  const fallbackDirection=raycaster.ray.direction.clone();fallbackDirection.y=0;if(fallbackDirection.lengthSq()>.01){fallbackDirection.normalize();setMoveDestination(camera.position.clone().addScaledVector(fallbackDirection,6),true,true)}
+  if(navigationHit&&navigationHit.distance===nearestDistance){setMoveDestination(navigationHit.object.userData.target,true,true);return'move'}
+  if(floorHit){setMoveDestination(floorHit.point,true,true);return'move'}
+  if(raycaster.ray.intersectPlane(groundPlane,groundHitPoint)){setMoveDestination(groundHitPoint,true,true);return'move'}
+  const fallbackDirection=raycaster.ray.direction.clone();fallbackDirection.y=0;if(fallbackDirection.lengthSq()>.01){fallbackDirection.normalize();setMoveDestination(camera.position.clone().addScaledVector(fallbackDirection,6),true,true);return'move'}return'none'
 }
 function constrainWalkPosition(position){
   let adjusted=false,x=THREE.MathUtils.clamp(position.x,WALK_BOUNDS.minX,WALK_BOUNDS.maxX),z=THREE.MathUtils.clamp(position.z,WALK_BOUNDS.minZ,WALK_BOUNDS.maxZ);if(x!==position.x||z!==position.z)adjusted=true;position.x=x;position.z=z;
