@@ -156,9 +156,9 @@ function buildZone(ci){
   const wood=new THREE.Mesh(new THREE.BoxGeometry(6.57,1.02,.32),new THREE.MeshStandardMaterial({color:0x9b6840,roughness:.85}));wood.position.y=.53;zone.add(wood);
   const navigationTarget=zoneLocalToWorld(layout,0,3.65);panel.userData={type:'navigation',target:navigationTarget};wood.userData={type:'navigation',target:navigationTarget};navigationMeshes.push(panel,wood);
   scene.userData.theme.panels.push(panel.material);scene.userData.theme.bases.push(wood.material);
-  const header=new THREE.Mesh(new THREE.PlaneGeometry(4.65,1.12),new THREE.MeshBasicMaterial({map:makeTextTexture(c.name,c.color,1024,256),transparent:true,toneMapped:false,depthWrite:false}));header.renderOrder=4;
-  header.position.set(0,4.13,.17);zone.add(header);
-  const accent=new THREE.Mesh(new THREE.BoxGeometry(6.05,.06,.08),new THREE.MeshBasicMaterial({color:c.color}));accent.position.set(0,3.84,.18);zone.add(accent);
+  const header=new THREE.Mesh(new THREE.PlaneGeometry(5.35,1.4),new THREE.MeshBasicMaterial({map:makeTextTexture(c.name,c.color,2048,512),transparent:true,toneMapped:false,depthWrite:false}));header.renderOrder=4;
+  header.position.set(0,4.18,.19);zone.add(header);
+  const accent=new THREE.Mesh(new THREE.BoxGeometry(6.05,.07,.08),new THREE.MeshBasicMaterial({color:c.color}));accent.position.set(0,3.58,.18);zone.add(accent);
   const groups=[];c.poems.forEach((p,pi)=>{
     const key=`${ci}-${pi}`,preset=galleryConfig.frames[key]||'portrait',framedArt=new THREE.Group();framedArt.position.z=.22;
     const frameBody=new THREE.Mesh(new THREE.BoxGeometry(1,1,.16),scene.userData.frameSideMaterial);frameBody.castShadow=renderer.shadowMap.enabled;framedArt.add(frameBody);
@@ -198,8 +198,9 @@ async function applyFramePreset(key,presetName,persist=true){
 }
 function makeTextTexture(title,color,w,h){
   const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');
-  const length=Array.from(title).length,fontSize=length>8?90:length>6?106:length>4?126:148;x.textAlign='center';x.textBaseline='middle';x.font=`${fontSize}px Jua, sans-serif`;x.lineJoin='round';x.shadowColor='#4f35252e';x.shadowBlur=16;x.shadowOffsetY=7;x.lineWidth=22;x.strokeStyle='#fffaf0';x.strokeText(title,w/2,h/2+3);x.shadowColor='transparent';x.lineWidth=8;x.strokeStyle='#604432';x.strokeText(title,w/2,h/2+3);x.fillStyle=color;x.fillText(title,w/2,h/2+3);
-  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.generateMipmaps=false;t.minFilter=THREE.LinearFilter;t.magFilter=THREE.LinearFilter;return t;
+  x.shadowColor='#4b302e35';x.shadowBlur=34;x.shadowOffsetY=15;roundedRect(x,118,62,w-236,h-124,72);x.fillStyle='#fffaf0f5';x.fill();x.shadowColor='transparent';x.lineWidth=16;x.strokeStyle=color;x.stroke();
+  const length=Array.from(title).length,fontSize=length>8?154:length>6?184:length>4?220:270;x.textAlign='center';x.textBaseline='middle';x.font=`${fontSize}px Jua, sans-serif`;while(x.measureText(title).width>w-390){const size=parseFloat(x.font)-8;if(size<=132)break;x.font=`${size}px Jua, sans-serif`}x.lineJoin='round';x.lineWidth=20;x.strokeStyle='#fffdf8';x.strokeText(title,w/2,h/2+5);x.lineWidth=7;x.strokeStyle='#493326';x.strokeText(title,w/2,h/2+5);x.fillStyle='#493326';x.fillText(title,w/2,h/2+5);
+  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.generateMipmaps=true;t.minFilter=THREE.LinearMipmapLinearFilter;t.magFilter=THREE.LinearFilter;t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());return t;
 }
 function makePoemPngTexture(ci,pi,presetName='portrait'){
   const preset=FRAME_PRESETS[presetName]||FRAME_PRESETS.portrait,key=`${ci}-${pi}-${presetName}`;if(poemPngTextures.has(key))return poemPngTextures.get(key);const aspect=(preset.w-.18)/(preset.h-.24),c=document.createElement('canvas'),textureWidth=coarsePointer?320:448;c.width=textureWidth;c.height=Math.round(textureWidth/aspect);const x=c.getContext('2d'),d=children[ci],h=c.height,pad=Math.round(Math.min(c.width,h)*.085),landscape=aspect>1;
