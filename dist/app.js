@@ -234,7 +234,7 @@ function makePngSprite(url,width,height,position,floatAmount=0,phase=0){
 
 function bind(){
   addEventListener('resize',resize);
-  addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key==='Escape'){closePoem();closeIndex();if(adminMode)closeSettings();stopGuideVoice()}});
+  addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key==='Escape'){if(adminMode&&!$('#password-modal').hidden){closePasswordModal();return}closePoem();closeIndex();if(adminMode)closeSettings();stopGuideVoice()}});
   addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
   canvas.addEventListener('pointerdown',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive)return;e.preventDefault();dragging=true;dragMoved=false;dragMode=null;dragStartX=lastX=e.clientX;dragStartY=lastY=e.clientY;canvas.classList.add('is-dragging');canvas.setPointerCapture(e.pointerId)});
   canvas.addEventListener('pointermove',e=>{if(!started||modalOpen||tourActive||entryActive||zoneTravelActive||!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY,totalX=e.clientX-dragStartX,totalY=e.clientY-dragStartY;if(Math.hypot(totalX,totalY)>DRAG_THRESHOLD){dragMoved=true;if(!dragMode)dragMode=e.shiftKey||Math.abs(totalX)>=Math.abs(totalY)*.9?'look':'move'}if(dragMode==='move'){queueDirectionalMove(-dy*.016);canvas.classList.add('is-moving-drag')}else if(dragMode==='look'){yaw-=dx*.0038;pitch=THREE.MathUtils.clamp(pitch-dy*.0028,PITCH_MIN,PITCH_MAX);camera.rotation.set(pitch,yaw,0)}lastX=e.clientX;lastY=e.clientY});
@@ -249,7 +249,7 @@ function bind(){
   if($('#cheer-message'))$('#cheer-message').oninput=()=>{$('#cheer-length').textContent=String($('#cheer-message').value.length)};
   if($('#cheer-form')&&!adminMode)$('#cheer-form').onsubmit=submitCheerMessage;
   addEventListener('storage',event=>{if(event.key!==CHEER_STORAGE_KEY)return;refreshCheerCards();renderCheerSection(selectedChild,selectedPoem);renderCheerAdmin()});
-  if($('#overview'))$('#overview').onclick=showOverview;$('#index-open').onclick=openIndex;$('#index-close').onclick=closeIndex;if(adminMode){$('#settings-open').onclick=openSettings;$('#settings-close').onclick=closeSettings;$$('[data-admin-logout]').forEach(button=>button.onclick=endAdminSession)}
+  if($('#overview'))$('#overview').onclick=showOverview;$('#index-open').onclick=openIndex;$('#index-close').onclick=closeIndex;if(adminMode){$('#settings-open').onclick=openSettings;$('#settings-close').onclick=closeSettings;$('#password-open').onclick=openPasswordModal;$('#password-close').onclick=closePasswordModal;$$('[data-password-close]').forEach(button=>button.onclick=closePasswordModal);$$('[data-admin-logout]').forEach(button=>button.onclick=endAdminSession)}
   $$('[data-close]').forEach(b=>b.onclick=closePoem);
   $('#prev-poem').onclick=()=>movePoem(-1);$('#next-poem').onclick=()=>movePoem(1);
 }
@@ -419,7 +419,9 @@ function movePoem(step){const count=children[selectedChild]?.poems.length||POEMS
 function openIndex(){modalOpen=true;$('#index-panel').classList.add('open');$('#index-panel').setAttribute('aria-hidden','false')}
 function closeIndex(){modalOpen=false;$('#index-panel').classList.remove('open');$('#index-panel').setAttribute('aria-hidden','true')}
 function openSettings(){if(!adminMode)return;closeIndex();closePoem();modalOpen=true;$('#settings-panel').classList.add('open');$('#settings-panel').setAttribute('aria-hidden','false');setTimeout(()=>$('#settings-close').focus(),220)}
-function closeSettings(){if(!adminMode)return;modalOpen=false;$('#settings-panel').classList.remove('open');$('#settings-panel').setAttribute('aria-hidden','true')}
+function closeSettings(){if(!adminMode)return;closePasswordModal();modalOpen=false;$('#settings-panel').classList.remove('open');$('#settings-panel').setAttribute('aria-hidden','true')}
+function openPasswordModal(){if(!adminMode)return;const modal=$('#password-modal'),status=$('#password-change-status');modal.hidden=false;modal.setAttribute('aria-hidden','false');status.textContent='';status.classList.remove('error');setTimeout(()=>$('#current-admin-password').focus(),80)}
+function closePasswordModal(){if(!adminMode)return;const modal=$('#password-modal');if(!modal||modal.hidden)return;modal.hidden=true;modal.setAttribute('aria-hidden','true');$('#current-admin-password').value=$('#new-admin-password').value=$('#confirm-admin-password').value='';$('#password-open')?.focus()}
 function normalizeCheerColor(value){return CHEER_NOTE_COLORS.includes(value)?value:CHEER_NOTE_COLORS[0]}
 function noteColorFor(item,index=0){if(CHEER_NOTE_COLORS.includes(item?.color))return item.color;const seed=[...(item?.id||String(index))].reduce((sum,char)=>sum+char.charCodeAt(0),0);return CHEER_NOTE_COLORS[seed%CHEER_NOTE_COLORS.length]}
 function readCheerMessages(){try{const stored=JSON.parse(localStorage.getItem(CHEER_STORAGE_KEY)||'[]');if(!Array.isArray(stored))return[];return stored.filter(item=>item&&typeof item==='object'&&Number.isInteger(item.ci)&&Number.isInteger(item.pi)&&item.ci>=0&&item.ci<CHILD_COUNT_MAX&&item.pi>=0&&item.pi<POEMS_PER_CHILD&&typeof item.author==='string'&&typeof item.message==='string').map(item=>({id:String(item.id||''),ci:item.ci,pi:item.pi,author:item.author.trim().slice(0,12),message:item.message.trim().slice(0,CHEER_MAX_LENGTH),color:CHEER_NOTE_COLORS.includes(item.color)?item.color:null,status:item.status==='hidden'?'hidden':'approved',createdAt:Number(item.createdAt)||Date.now()})).filter(item=>item.id&&item.author&&item.message)}catch{return[]}}

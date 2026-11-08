@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=96">
+  <link rel="stylesheet" href="styles.css?v=105">
 </head>
 <body data-admin="true" class="admin-mode">
   <a class="skip" href="#settings-panel">3D 전시를 건너뛰고 설정 열기</a>
@@ -89,23 +89,13 @@
   </aside>
 
   <aside id="settings-panel" class="settings-panel" aria-hidden="true" aria-labelledby="settings-title">
-    <header><div><small>전시 편집</small><h2 id="settings-title">전시장 설정</h2></div><button id="settings-close" class="close-button" type="button" aria-label="설정 닫기"><img src="assets/ui-close.png" alt="" aria-hidden="true"></button></header>
+    <header><div><small>전시 편집</small><h2 id="settings-title">전시장 설정</h2></div><div class="settings-header-actions"><button id="password-open" class="password-key-button" type="button" aria-label="관리자 비밀번호 변경 열기" aria-haspopup="dialog"><span class="password-key-icon" aria-hidden="true"></span></button><button id="settings-close" class="close-button" type="button" aria-label="설정 닫기"><img src="assets/ui-close.png" alt="" aria-hidden="true"></button></div></header>
     <section class="gallery-config" aria-labelledby="gallery-config-title">
       <h3 id="gallery-config-title">전시장 기본 설정</h3>
       <label class="name-field" for="gallery-name"><span>메인 타이틀 제목</span><div class="name-control"><input id="gallery-name" type="text" maxlength="30" placeholder="예: 우리 반 동시 전시회" autocomplete="off"></div><small>‘햇살 동시 마루’ 대신 원하는 제목을 입력하세요. 아래의 전체 저장 버튼을 누르면 첫 화면과 전시장 상단에 함께 반영됩니다.</small></label>
       <label class="child-count-field" for="child-count"><span>참여 어린이 수</span><div class="child-count-control"><input id="child-count" type="number" min="1" max="12" step="1" inputmode="numeric"></div><small>기본 10명이며, 1명부터 12명까지 설정할 수 있습니다. 전체 저장 후 전시 구역과 작품 목록이 함께 바뀝니다.</small></label>
       <fieldset class="theme-field"><legend>전시장 배경</legend><div class="theme-options"><button type="button" data-theme-choice="warm" aria-pressed="false"><i class="theme-preview warm" aria-hidden="true"></i><strong>따뜻한 원목</strong><span>햇살과 밝은 마루</span></button><button type="button" data-theme-choice="storybook" aria-pressed="false"><i class="theme-preview storybook" aria-hidden="true"></i><strong>그림책 원화전</strong><span>크림 벽과 파스텔 전시</span></button></div></fieldset>
       <p>두 배경 모두 실제 문을 열고 입장합니다. 그림책 원화전 배경은 크림색 종이 벽, 파스텔 전시 면, 낮은 원목 진열대와 부드러운 조명을 사용합니다.</p>
-    </section>
-    <section class="settings-save-bar" aria-label="전체 설정 저장">
-      <div><strong>모든 설정을 한 번에 저장</strong><span id="settings-save-state">아이 이름과 현재 설정을 모두 확인해 주세요.</span></div>
-      <button id="settings-save-all" type="button">전체 설정 저장하고 전시장 보기</button>
-    </section>
-    <section class="password-config" aria-labelledby="password-config-title">
-      <h3 id="password-config-title">관리자 비밀번호 변경</h3>
-      <div class="password-fields"><label><span>현재 비밀번호</span><input id="current-admin-password" type="password" autocomplete="current-password"></label><label><span>새 비밀번호</span><input id="new-admin-password" type="password" minlength="6" autocomplete="new-password"></label><label><span>새 비밀번호 확인</span><input id="confirm-admin-password" type="password" minlength="6" autocomplete="new-password"></label></div>
-      <button id="admin-password-change" type="button">비밀번호 변경</button>
-      <p id="password-change-status" role="status" aria-live="polite"></p>
     </section>
     <section class="cheer-admin" aria-labelledby="cheer-admin-title">
       <div class="cheer-admin-heading"><div><small>보호자·관람객 메시지</small><h3 id="cheer-admin-title">응원 메시지 관리</h3></div><span id="cheer-pending-count">전체 0개</span></div>
@@ -116,8 +106,22 @@
     <p class="settings-note">아이별 작품 5점의 원본 이미지를 넣고, 각 작품에 맞는 액자 방향과 크기를 선택하세요. PNG·JPG 파일 전체가 잘리지 않게 표시됩니다.</p>
     <div id="scan-status" class="scan-status" role="status" aria-live="polite"></div>
     <div id="settings-list" class="settings-list"></div>
+    <section class="settings-save-bar" aria-label="전체 설정 저장">
+      <div><strong>모든 설정을 한 번에 저장</strong><span id="settings-save-state">아이 이름과 현재 설정을 모두 확인해 주세요.</span></div>
+      <button id="settings-save-all" type="button">전체 설정 저장하고 전시장 보기</button>
+    </section>
   </aside>
 
-  <script type="module" src="app.js?v=104"></script>
+  <section id="password-modal" class="password-modal" role="dialog" aria-modal="true" aria-labelledby="password-config-title" aria-hidden="true" hidden>
+    <button class="password-modal-shade" type="button" aria-label="비밀번호 변경 창 닫기" data-password-close></button>
+    <div class="password-config password-dialog">
+      <div class="password-dialog-heading"><div><small>관리자 보안</small><h3 id="password-config-title">관리자 비밀번호 변경</h3></div><button id="password-close" class="close-button" type="button" aria-label="비밀번호 변경 창 닫기"><img src="assets/ui-close.png" alt="" aria-hidden="true"></button></div>
+      <div class="password-fields"><label><span>현재 비밀번호</span><input id="current-admin-password" type="password" autocomplete="current-password"></label><label><span>새 비밀번호</span><input id="new-admin-password" type="password" minlength="6" autocomplete="new-password"></label><label><span>새 비밀번호 확인</span><input id="confirm-admin-password" type="password" minlength="6" autocomplete="new-password"></label></div>
+      <button id="admin-password-change" type="button">비밀번호 변경</button>
+      <p id="password-change-status" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <script type="module" src="app.js?v=105"></script>
 </body>
 </html>
